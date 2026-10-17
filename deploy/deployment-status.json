@@ -1,0 +1,579 @@
+{
+  "checkedOn": "2026-10-17",
+  "region": "ap-northeast-2",
+  "localProfile": "parkick",
+  "initialDeploymentStorage": "private-local",
+  "initialDeploymentPhotoDirectory": "/var/lib/parkick/reports",
+  "s3DeploymentDeferred": true,
+  "applicationUrl": "https://15.165.235.154",
+  "ec2": {
+    "name": "sgu-202686-ec2",
+    "instanceId": "i-0a95ee1a77e3722a4",
+    "instanceType": "t3.small",
+    "imageId": "ami-0c713e716602facc2",
+    "operatingSystem": "Ubuntu Server 24.04 LTS",
+    "stateAtCheck": "running",
+    "publicIpAtCheck": "15.165.235.154",
+    "elasticIpAllocated": false,
+    "securityGroupId": "sg-005d27768eef97969",
+    "keyPairName": "sgu-202686-key",
+    "rootDiskGiB": 30,
+    "rootDiskType": "gp3",
+    "rootDiskEncrypted": true,
+    "rootDiskDeleteOnTermination": false,
+    "cpuCreditMode": "standard",
+    "imdsV2Required": true,
+    "iamProfileAttached": false,
+    "applicationInstalled": true,
+    "postgresqlInstalled": true,
+    "httpsConfigured": true,
+    "nodeVersion": "22.23.3",
+    "applicationBuild": "passed-on-ec2",
+    "migrationAndDemoSeed": "passed",
+    "apiAndDatabaseListenOnLoopbackOnly": true
+  },
+  "managementAccess": {
+    "directSshCheck": "passed",
+    "resolvedCause": "The HTTPS IP check and SSH connections used different public source IPv4 addresses.",
+    "webObservedSourceIp": "211.234.206.233",
+    "sshObservedSourceIp": "211.37.75.121",
+    "sshAllowedCidr": "0.0.0.0/0",
+    "sshRuleId": "sgr-02c4e75040adec715",
+    "sshTemporaryTestingAccess": {
+      "enabled": true,
+      "authorizedBy": "User explicitly requested keeping unrestricted SSH enabled until further notice",
+      "openedOn": "2026-10-15",
+      "protocol": "tcp",
+      "port": 22,
+      "previousAllowedCidr": "211.37.75.121/32",
+      "automaticExpiry": false,
+      "restoreWhen": "Only when the user requests restricting SSH again; then verify the actual SSH source IP",
+      "verifiedBySecurityGroupReadback": true
+    },
+    "hostKeyVerifiedAgainstEc2Console": true,
+    "instanceConnectEndpointDryRun": "not-authorized",
+    "instanceConnectEndpointCreated": false
+  },
+  "https": {
+    "certificateType": "Lets Encrypt IPv4 shortlived",
+    "certbotVersion": "5.8.0",
+    "certificateExpiresAt": "2026-10-22T02:45:26Z",
+    "renewalTimer": "snap.certbot.renew.timer",
+    "renewalTimerEnabled": true,
+    "renewalDryRunWithDeployHook": "passed"
+  },
+  "validation": {
+    "externalHttpsSmoke": "6 checks passed",
+    "syntheticSubmission": "HTTP 201; identical retry HTTP 200",
+    "mobileChrome": "passed: secure context, rendering, wizard navigation, SPA refresh, no runtime errors",
+    "fixtureDatabaseAndPhotoVerification": "passed: exact report and relations, JPEG hash and EXIF, private file permissions, no public image access",
+    "fixtureCleanup": "passed: only the synthetic report, its related records and one photo removed",
+    "phase5BackendUnit": "74 passed",
+    "phase5DatabaseIntegration": "11 passed",
+    "phase5SubmissionBrowser": "7 passed, including a response delayed beyond the former 60-second limit",
+    "phase5BaselineBrowser": "3 passed",
+    "phase5LintAndBuild": "frontend and backend lint passed; full production build passed on EC2",
+    "phase5LiveMobileBrowser": "passed: six-step submission HTTP 201, completion receipt, phone-only lookup HTTP 200 with no-store, detail history, no horizontal overflow, phone not persisted, detail refresh requires phone re-entry",
+    "phase5SyntheticCleanup": "passed: both verification fixtures and their individual photos removed by exact ID, marker, payload and hash checks; existing reports preserved",
+    "adminAuthBackendUnit": "80 passed",
+    "adminAuthDatabaseIntegration": "14 passed, including 3 authentication tests for persistence across new applications, revocation, expiry and inactive accounts",
+    "adminAuthLintAndBuild": "frontend/backend lint, frontend build and backend TypeScript compilation passed locally; full Linux production build passed on EC2",
+    "adminAuthDevelopmentBrowser": "1 passed: existing development login, protected dashboard and logout",
+    "adminAuthLiveBrowser": "passed: unauthenticated access rejected, database platform admin login, Secure HttpOnly SameSite=Strict cookie, session restored on refresh, dashboard, logout invalidates original token, no runtime errors",
+    "adminAuthLiveCheckedAt": "2026-10-15T14:31:34.921Z",
+    "phase6BackendUnit": "91 passed",
+    "phase6DatabaseIntegration": "20 passed, including platform/tenant isolation, authorized evidence, status concurrency, retry and transaction rollback",
+    "phase6AdminBrowser": "2 passed against isolated PostgreSQL: collection and towing with public/internal note separation",
+    "phase6BaselineBrowser": "3 passed",
+    "phase6LintAndBuild": "frontend/backend lint and TypeScript passed locally; full clean Linux production build passed on EC2",
+    "phase6LiveBrowser": "passed: database dashboard and report search, private JPEG evidence, processing then collection, direct towing, unchanged retry, completed modification 409, phone lookup with public notes only, mobile layout and no runtime errors",
+    "phase6LiveCheckedAt": "2026-10-15T15:37:35.877Z",
+    "phase6SyntheticCleanup": "passed: exact two synthetic reports and their relations/photos removed after UUID, marker, completion actor/time, contact HMAC and image hash checks; existing reports and administrator preserved",
+    "naverLiveBrowser": "partial after Client ID refresh: SDK 200, map and nine tiles visible; Reverse Geocoding 403; no runtime errors, real GPS calls or report submissions",
+    "adminMapBackendUnit": "92 passed",
+    "adminMapDatabaseIntegration": "22 passed, including map pagination, filters, minimal payload and platform/tenant isolation",
+    "adminMapBrowser": "2 passed against isolated PostgreSQL with a mocked NAVER SDK",
+    "adminMapExistingManagementBrowser": "2 passed",
+    "adminMapLintAndBuild": "frontend/backend lint and TypeScript passed locally; full clean Linux production build passed on EC2",
+    "adminMapLiveBrowser": "passed: actual NAVER SDK and tiles, authorized database coordinates, grouped and single pins, click information and report detail actions, status filtering, mobile controls without popup overlap, no reverse geocoding and no browser runtime errors",
+    "adminMapLiveCheckedAt": "2026-10-16T02:56:15.142Z",
+    "adminMapSyntheticCleanup": "passed: only the three exact synthetic reports, relations and individual photos removed; existing reports and administrator preserved",
+    "reverseGeocodingFrontend": "frontend lint and production build passed; map browser 8/8 passed using mocked NAVER SDK",
+    "reverseGeocodingLinuxBuild": "full clean production build and API/report-intake readiness passed on EC2",
+    "reverseGeocodingLiveBrowser": "frontend retry, coordinate preservation and manual fallback passed; actual NAVER SDK 200, address API 403 on initial and manually retried request. Zero runtime errors, report submissions or actual GPS reads.",
+    "reverseGeocodingLiveCheckedAt": "2026-10-16T07:13:11.058Z",
+    "naverClientIdRefreshBuild": "frontend production build passed; archive SHA-256 verified on EC2; public Client ID updated without backend/database restart",
+    "naverClientIdRefreshLiveBrowser": "new Client ID: SDK 200, map and nine tiles visible, no runtime errors; address API still 403; no GPS reads or report submissions",
+    "naverClientIdRefreshLiveCheckedAt": "2026-10-16T07:16:57.818Z",
+    "adminClustersFrontend": "frontend lint and production build passed; all 10 frontend unit tests passed, including 6 clustering tests",
+    "adminClustersBrowser": "3 passed with isolated real PostgreSQL and NAVER SDK double: grouping/zoom/keyboard, duplicate and max-zoom details, popup preservation, filters, escaping, cleanup and zero address lookups",
+    "adminClustersLinuxBuild": "clean npm ci and full production build passed on EC2; existing schema/migrations unchanged; production health and report intake passed",
+    "adminClustersLiveBrowser": "passed with real NAVER SDK: actual API marker totals retained; browser-only synthetic nearby count, click zoom split, fit regroup, identical and max-zoom details; zero runtime errors, address lookups or report writes",
+    "adminClustersLiveCheckedAt": "2026-10-16T08:23:37.019Z",
+    "operatorQrBackendUnitAndApi": "101 passed after final Beam literal-format correction",
+    "operatorQrBrowser": "26 full browser tests passed; all 4 operator image-decoding cases passed again after updating the Beam fixture to the exact observed URL shape",
+    "operatorQrLintAndBuild": "frontend/backend lint and TypeScript passed; clean full production build, health and report intake passed on EC2",
+    "operatorQrOriginalPayloads": "4 exact decoded originals checked locally, without URL normalization before parsing",
+    "operatorQrLiveBrowser": "passed: supplied Kakao photo, public Beam and GCOO photos, and numeric-only Beam photo decoded in browser; correct auto-fill/fallback, explicit confirmation and next step; no vendor URL visits, photo uploads or report submissions",
+    "operatorQrLiveCheckedAt": "2026-10-16T08:49:43.238Z",
+    "operatorSelectionBackend": "110 backend tests passed; 5 normalization CLI backup/guard tests passed separately",
+    "operatorSelectionBrowser": "31 full e2e tests passed; one late QR-response cancellation regression passed after notice cleanup",
+    "operatorSelectionPersistence": "4 dedicated local PostgreSQL browser tests passed, including canonical Kakao manual selection storage and idempotent retry",
+    "operatorSelectionBuild": "frontend/backend lint and TypeScript passed; clean full EC2 production build, shared catalog import, health and report intake passed",
+    "operatorSelectionLive": "passed: four original QR photos plus six dropdown choices, back navigation, custom alias canonicalization and unknown selection; zero report submissions or photo uploads",
+    "operatorSelectionLiveCheckedAt": "2026-10-16T09:13:44.795Z",
+    "operatorSelectionFinalUi": "passed: final selection wording, real Kakao photo recognition and manual operator change; no production test submissions/uploads",
+    "operatorSelectionFinalUiCheckedAt": "2026-10-16T09:18:25.708Z",
+    "relatedQrBackend": "127 unit/API tests passed, including bounded-scan exact-batch replay regression",
+    "relatedReportsDatabase": "14 dedicated PostgreSQL/API tests passed (8 existing plus 6 related); six related tests passed again after replay-limit fix",
+    "relatedQrBrowser": "39 full browser tests passed, including 17 operator QR cases and two delayed local-image decode cancellation cases",
+    "relatedReportsAdminBrowser": "4 dedicated PostgreSQL administrator browser tests passed, including explicit selection, separate histories, public/internal note privacy, conflict atomicity and mobile layout",
+    "relatedQrLocalChecks": "Frontend/backend lint and TypeScript passed; frontend production build passed. Local backend Prisma regeneration blocked by Windows DLL EPERM; isolated clean EC2 generation and full build passed.",
+    "relatedQrLinuxBuild": "Clean npm ci and full frontend/backend build passed; schema/migrations unchanged, shared catalog and preserved configuration checked, API health and report intake ready",
+    "relatedQrLiveBrowser": "Four original photos decoded correctly on actual HTTPS mobile UI; numeric Beam required explicit company selection. Authenticated related GET checked for six existing reports; browser-only synthetic selection/confirmation cancelled. Zero report creations/completions, photo uploads, runtime errors or vendor requests.",
+    "relatedQrLiveCheckedAt": "2026-10-16T13:48:54.246Z"
+  },
+  "activeRelease": {
+    "phase": 6,
+    "phase6Progress": "database administrator authentication, real dashboard/list/detail/evidence, collection/towing, report map and tenant-scoped authorization deployed; tenant account administration, jurisdiction assignment and detailed statistics remain pending",
+    "deployedAt": "2026-10-16T16:04:41.330Z",
+    "path": "/srv/parkick/releases/20261017-photo-upload-1",
+    "applicationLink": "/srv/parkick/app",
+    "previousRelease": "/srv/parkick/releases/20261016-related-qr-1",
+    "sourceArchiveSha256": "e48f081af96fa1b579c7abefc7af59750ed795aa650504c9bb074a3ee26bca1f",
+    "changes": [
+      "Database dashboard, filtered report lists, details and authenticated private evidence",
+      "Platform administrator global access and tenant administrator scope on every report operation",
+      "Processing, collection and towing completion with atomic actor/time/history and safe retries",
+      "Public/internal notes with only public notes included in citizen lookup",
+      "Independent Bedrock region configuration and synthetic connection check CLI; production AI remains disabled",
+      "NAVER administrator dashboard and dedicated /admin/map with tenant-scoped coordinates, grouped markers, report popups, detail links, filters and pagination; map controls remain outside the canvas to avoid covering popups",
+      "Citizen reverse geocoding: 300ms debounce, preserve resolved addresses on step revisit, retry on failure/timeout and protect manual text. Actual NAVER address requests remain HTTP 403; application settings require confirmation.",
+      "Administrator maps group nearby reports by 56 CSS pixels at current zoom; clicking a cluster zooms to separate coordinates, while exact duplicates and max-zoom overlaps expose all report details.",
+      "Verified Kakao and Beam QR families identify operator and device; GCOO 08201 plus six digits identifies the printed number, while the older ten-digit token identifies only the operator. Five-digit QR fills a number only after explicit Beam selection. Local multiscale/contrast decoding and manual-edit cancellation protect the reporting flow.",
+      "Single operator selector for six brands; shared catalog canonicalizes QR/manual submissions, AI input and legacy admin/public display/search. One recognized legacy name normalized with private backup; custom names preserved.",
+      "Related unfinished reports retain separate records. Same tenant/region/operator/device within 100m and 24h are suggested, with completion boundaries separating incidents. Explicitly selected reports complete atomically with separate histories and exact-batch retry support.",
+      "Evidence photos are resized before upload to at most 2560px and JPEG quality 0.85, with EXIF orientation, stable retry bytes, small-file preservation, input validation and cancellation cleanup. QR decoding uses its existing separate path."
+    ],
+    "databaseMigrationsApplied": false,
+    "existingDatabasePhotosAndContactKeysPreserved": true,
+    "frontendConfigurationUpdate": {
+      "deployedAt": "2026-10-16T07:12:57.380490Z",
+      "scope": "frontend static build and reviewed public environment settings only; updated NAVER public Client ID",
+      "artifactSha256": "cf3eb623b3dc72780cc882e715c4818898f41f4cc345c78b363e0e73c1205b51",
+      "previousIndexAndConfigurationBackup": "/srv/parkick/releases/20261016-reverse-geocoding-1/frontend/naver-backup-20261016-id-refresh-1",
+      "backendOrDatabaseRestarted": false,
+      "release": "/srv/parkick/releases/20261016-reverse-geocoding-1",
+      "historicalRelease": "/srv/parkick/releases/20261016-reverse-geocoding-1"
+    },
+    "preservedEarlierReleases": [
+      "/srv/parkick/releases/20261016-operator-selection-2",
+      "/srv/parkick/releases/20261016-operator-selection-1",
+      "/srv/parkick/releases/20261016-operator-qr-2",
+      "/srv/parkick/releases/20261016-operator-qr-1",
+      "/srv/parkick/releases/20261016-reverse-geocoding-1",
+      "/srv/parkick/releases/20261016-admin-clusters-1",
+      "/srv/parkick/releases/20261016-admin-map-2",
+      "/srv/parkick/releases/20261016-admin-map-1",
+      "/srv/parkick/releases/20261016-phase6-1",
+      "/srv/parkick/releases/20261015-admin-auth-1"
+    ],
+    "reviewedPublicFrontendConfigurationPreserved": true,
+    "frontendConfigurationHistory": [
+      {
+        "deployedAt": "2026-10-16T02:16:06.740732Z",
+        "scope": "frontend static build and reviewed public environment settings only",
+        "artifactSha256": "c3f6b64c06c1184e6339bac92e58323165a7e74e5a89b456a0cab4ad127538d1",
+        "previousIndexAndConfigurationBackup": "/srv/parkick/releases/20261016-phase6-1/frontend/naver-backup-20261016-1",
+        "backendOrDatabaseRestarted": false,
+        "historicalRelease": "/srv/parkick/releases/20261016-phase6-1"
+      }
+    ]
+  },
+  "administratorAuthentication": {
+    "mode": "database",
+    "developmentMockEnabled": false,
+    "requestedPlatformAdministratorProvisioned": true,
+    "role": "PLATFORM_ADMIN",
+    "passwordStorage": "scrypt hash in admins; no plaintext credentials deployed",
+    "sessionStorage": "SHA-256 token digests, expiry and revocation in admin_sessions",
+    "provisioning": "stdin-only explicit command; existing mismatched account is not overwritten"
+  },
+  "storageAssessment": {
+    "checkedOn": "2026-10-15",
+    "diskAvailableApproxGiB": 22,
+    "photoDirectoryApproxMiB": 4.6,
+    "recommendation": "Keep the current EC2 deployment for testing; move photos to private S3 when the instance role is available and ongoing use grows. DB backup remains a separate requirement."
+  },
+  "s3": {
+    "bucket": "sgu-202686-s3",
+    "reportPrefix": "reports",
+    "blockAllPublicAccess": true,
+    "objectOwnership": "BucketOwnerEnforced",
+    "defaultEncryption": "AES256",
+    "localPutGetDeleteCheck": "passed",
+    "ec2PutGetDeleteCheck": "not-run"
+  },
+  "remaining": [
+    "Keep SSH TCP 22 at 0.0.0.0/0 per the user's latest instruction until they request a change; no automatic expiry is configured.",
+    "Phase 6 remaining: tenant account administration, real municipality/region registration and jurisdiction assignment and detailed statistics.",
+    "Bedrock deferred: the EC2 execution profile is not attached. SafeInstanceProfile-sgu-202686 exists, but verify its trust and effective model permissions before connecting it. Existing Lambda is a DynamoDB-backed chatbot, not a drop-in report generator.",
+    "The public IP is not elastic; after an IP change update HTTPS and FRONTEND_ORIGIN before resuming service.",
+    "For a future S3 transition only: an administrator must prepare the EC2 instance role; iam:CreateRole was explicitly denied by SafePowerUser.",
+    "Citizen Reverse Geocoding remains HTTP 403 after the new Client ID was rebuilt and deployed. Same-Application service selection and Web service URL require console verification; the exact cause is unconfirmed. Administrator report maps use stored coordinates."
+  ],
+  "administratorReportManagement": {
+    "mode": "database",
+    "platformScope": "all reports",
+    "tenantScope": "session administrator tenantId enforced on dashboard/list/map/detail/image/status transition",
+    "transitions": [
+      "RECEIVED to PROCESSING",
+      "RECEIVED or PROCESSING to COMPLETED with COLLECTED or TOWED"
+    ],
+    "completedReportsImmutable": true,
+    "citizenHistory": "public notes only; internal notes and administrator identity excluded",
+    "tenantAccountManagementUiImplemented": false,
+    "currentReportRegionCode": "local-development",
+    "realJurisdictionAssignmentImplemented": false,
+    "map": {
+      "implemented": true,
+      "page": "/admin/map",
+      "dashboardMap": true,
+      "api": "GET /api/admin/reports/map",
+      "displayPageSize": 200,
+      "coordinates": "stored report latitude and longitude",
+      "sameLocation": "exact coordinates remain one marker with all report summaries; other nearby locations combine by current screen distance and split on zoom",
+      "popup": "report identifier, status, operator/device, address or coordinates, submission time and detail link",
+      "filters": [
+        "status",
+        "search"
+      ],
+      "reverseGeocodingUsed": false,
+      "liveVerifiedAt": "2026-10-16T02:56:15.142Z",
+      "nearbyClustering": {
+        "screenRadiusPixels": 56,
+        "scope": "current filtered page of up to 200 reports",
+        "counts": "all reports in each connected nearby group, with mixed status color when applicable",
+        "clusterClick": "fit member coordinates and zoom in; split as markers separate on screen",
+        "sameCoordinateOrMaximumZoom": "open all grouped report summaries and detail links",
+        "recalculateOn": [
+          "zoom",
+          "idle",
+          "resize",
+          "filters/page change"
+        ],
+        "storedCoordinatesModified": false,
+        "deployed": true
+      }
+    }
+  },
+  "bedrock": {
+    "checkedOn": "2026-10-16",
+    "requestedRegion": "us-east-1",
+    "regionSetting": "BEDROCK_REGION, falling back to AWS_REGION; S3 continues to use AWS_REGION",
+    "productionProvider": "disabled",
+    "localCredentialCheck": "Later GetInferenceProfile retry could not create/refresh login credentials; AWS CLI suggested missing signin:CreateOAuth2Token. This is a credential refresh failure, not evidence of model invocation denial. Earlier Lambda/profile inspection remains recorded.",
+    "invokeModelPermissionVerified": false,
+    "virginiaOnlyPolicyVerified": false,
+    "actualModelInvocations": 0,
+    "ec2InstanceProfileAttached": false,
+    "ec2IamMetadataCheck": "IMDSv2 iam/info returned 404; DescribeInstances IamInstanceProfile null; running service has no AWS credential environment variables or service-user shared credential/config files",
+    "connectionDeferred": true,
+    "connectionCheckScript": "backend/scripts/check-bedrock.ts",
+    "lambdaInspection": {
+      "checkedOn": "2026-10-16",
+      "functionName": "sgu-202686-bedrock",
+      "region": "ap-northeast-2",
+      "result": "configuration and redacted source inspected; current PC principal Invoke DryRun succeeded with HTTP 204",
+      "functionConfigurationVerified": true,
+      "functionInvoked": false,
+      "lambdaRequiredByApplication": false,
+      "runtime": "python3.14",
+      "architecture": "x86_64",
+      "memoryMiB": 128,
+      "timeoutSeconds": 60,
+      "state": "Active",
+      "vpcAttached": false,
+      "functionUrlConfigured": false,
+      "executionRole": "SafeRole-sgu-202686",
+      "bedrockEndpointRegion": "us-east-1",
+      "modelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "inferenceProfileStatus": "ACTIVE",
+      "inferenceDestinationRegions": [
+        "us-east-1",
+        "us-east-2",
+        "us-west-2"
+      ],
+      "input": "prompt and optional session_id",
+      "behavior": "DynamoDB in Seoul loads session conversation history, writes the user message, calls Bedrock Converse with history, and writes the assistant response",
+      "reuseAssessment": "not a drop-in Parkick report generator; it has chatbot prompting, history-dependent token usage and DynamoDB persistence",
+      "maxOutputTokens": 512,
+      "temperature": 0.7,
+      "localCallerDryRunStatus": 204,
+      "ec2CallerCredentialsAvailable": false,
+      "directPath": "EC2 role requires bedrock:InvokeModel on the selected inference profile and all destination models, plus bedrock:GetInferenceProfile on the profile",
+      "lambdaPath": "EC2 role requires lambda:InvokeFunction; Lambda role requires Bedrock and current DynamoDB access; EC2 permissions do not follow from local PC login",
+      "codeModified": false
+    },
+    "recommendedPath": "EC2 backend directly to Bedrock using the existing provider, after verifying and attaching an EC2 execution profile with the required model permissions",
+    "existingInstanceProfile": {
+      "name": "SafeInstanceProfile-sgu-202686",
+      "role": "SafeRole-sgu-202686",
+      "discovery": "ListInstanceProfilesForRole",
+      "attachedToParkickEc2": false,
+      "attachedBedrockPolicyName": "Shingu-AllowBedrockInvoke",
+      "trustAndEffectivePermissionsVerified": false,
+      "inspectionLimit": "GetRole, GetRolePolicy, GetPolicyVersion and SimulatePrincipalPolicy were AccessDenied; no role or profile was modified or attached"
+    },
+    "previousLocalCredentialCheck": "parkick browser login completed; local principal sgu-202686 can inspect Lambda and Invoke DryRun returned 204",
+    "directInvocationPermissionsPlan": {
+      "preparedOn": "2026-10-16",
+      "policyFile": "deploy/iam-bedrock-report-policy.json",
+      "administratorInstructions": "deploy/iam-admin-setup.md",
+      "modelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "endpointRegion": "us-east-1",
+      "destinationRegions": [
+        "us-east-1",
+        "us-east-2",
+        "us-west-2"
+      ],
+      "runtimeActions": [
+        "bedrock:InvokeModel",
+        "bedrock:GetInferenceProfile"
+      ],
+      "scope": "exact account inference profile and three regional foundation-model ARNs; foundation-model invocation restricted by InferenceProfileArn condition",
+      "validation": "local JSON/action/resource scope and official documentation checked; live IAM policy validation unavailable",
+      "awsPermissionsApplied": false,
+      "existingProfileAttached": false,
+      "productionAiEnabled": false,
+      "actualModelInvocations": 0,
+      "checkScriptLimitation": "current check-bedrock.ts accepts amazon.* base models only; it cannot validate the selected Claude profile"
+    }
+  },
+  "naverMaps": {
+    "clientIdConfigured": true,
+    "clientIdSha256": "1c304e3a25d0aabdcc80c337947d34887af318a2b214e9e41c61229e93dd6575",
+    "localSetting": "frontend/.env: VITE_NAVER_MAP_CLIENT_ID",
+    "productionSetting": "/srv/parkick/app/frontend/.env.production: VITE_NAVER_MAP_CLIENT_ID",
+    "configurationRequiresFrontendRebuild": true,
+    "checkedAt": "2026-10-16T07:16:57.818Z",
+    "sdkHttpStatus": 200,
+    "mapVisible": true,
+    "loadedTiles": 9,
+    "addressLookup": "not operational after Client ID refresh: actual browser reverse geocoding still HTTP 403 with no structured provider error. Exact cause and console application service authorization remain unverified.",
+    "authenticationFailureCallback": false,
+    "browserRuntimeErrors": 0,
+    "testUsedActualGps": false,
+    "testSubmittedReports": false,
+    "administratorMap": {
+      "checkedAt": "2026-10-16T02:56:15.142Z",
+      "sdkHttpStatus": 200,
+      "mapAndTilesVisible": true,
+      "singleAndGroupedMarkerInformationVerified": true,
+      "mobileVerified": true,
+      "reverseGeocodingRequests": 0,
+      "browserRuntimeErrors": 0,
+      "testSubmittedSyntheticReports": 3,
+      "syntheticReportsAndPhotosCleaned": true,
+      "nearbyClusteringCheckedAt": "2026-10-16T08:23:37.019Z",
+      "nearbyClusterZoomSplitVerified": true,
+      "identicalAndMaximumZoomDetailsVerified": true,
+      "latestCheckSyntheticReportsCreated": 0,
+      "latestCheckScope": "actual authorized API count preservation and browser-only synthetic map responses using the real NAVER SDK"
+    },
+    "pricingReference": {
+      "checkedOn": "2026-10-16",
+      "product": "new Maps",
+      "reverseGeocodingFreeCallsPerMonth": 3000000,
+      "reverseGeocodingExcessKrwPerCallExcludingVat": 0.5,
+      "dynamicMapFreeCallsPerMonth": 6000000,
+      "dynamicMapExcessKrwPerCallExcludingVat": 0.1,
+      "condition": "free usage applies only to the representative account and is aggregated across applications per API",
+      "accountEligibilityAndActualUsageVerified": false,
+      "legacyException": "old AI NAVER API free usage ended on 2025-07-01; the new Maps product is separate",
+      "source": "https://www.ncloud.com/charge/region/ko"
+    },
+    "reverseGeocoding": {
+      "frontendImplemented": true,
+      "frontendDeployed": true,
+      "providerOperational": false,
+      "checkedAt": "2026-10-16T07:13:11.058Z",
+      "httpStatuses": [
+        403,
+        403
+      ],
+      "addressPreference": [
+        "roadAddress",
+        "jibunAddress"
+      ],
+      "coordinateDebounceMilliseconds": 300,
+      "responseTimeoutMilliseconds": 8000,
+      "preserveResolvedAddressOnRevisit": true,
+      "manualAddressProtected": true,
+      "retryAfterFailureOrTimeout": true,
+      "automaticRetry": false,
+      "backendPrivateKeyRequired": false,
+      "consoleActionPending": "New public Client ID was rebuilt and deployed; verify Dynamic Map and Reverse Geocoding on that same NAVER Application and Web service URL https://15.165.235.154. Console settings cannot be inspected from this workspace.",
+      "configurationChangeRequiresRebuild": "service selection and allowed URL changes do not change the deployed public ID; changing the Client ID requires a frontend rebuild"
+    },
+    "clientConfigurationUpdatedAt": "2026-10-16T07:12:57.380490Z",
+    "checkScope": "citizen report wizard after Client ID refresh; actual SDK, visible map and nine tiles; address API still 403"
+  },
+  "qrOperatorRecognition": {
+    "checkedAt": "2026-10-16T13:48:54.246Z",
+    "deployed": true,
+    "supportDocumentation": "deploy/qr-operator-support.md",
+    "automaticOperatorAndDevice": [
+      "kakao-bike-launch-v1: t.kakao.com launch with bike/qrcode and two-letter/four-digit ID",
+      "beam-deeplink-v1: deeplink.ridebeam.com optional root slash with seven digits or two uppercase letters plus three digits",
+      "gcoo-open-v1: open.gbike.io b token with exact 08201 prefix plus six-digit printed number"
+    ],
+    "automaticOperatorOnly": [
+      "gcoo-open-v1: open.gbike.io with ten-digit b token; deviceId is null"
+    ],
+    "unverifiedOperators": [
+      "쏘카 일레클",
+      "알파카",
+      "스윙"
+    ],
+    "unverifiedForms": "Other numeric or URL/ID families require manual identification; do not generalize the GCOO prefix to arbitrary tokens",
+    "scannedTextPreserved": true,
+    "qrDestinationsFetched": false,
+    "photosCopiedIntoDeployment": false,
+    "productionTestReportsCreated": 0,
+    "manualOperatorSelection": [
+      "지쿠",
+      "빔",
+      "카카오 T 바이크",
+      "쏘카 일레클",
+      "알파카",
+      "스윙"
+    ],
+    "operatorCatalog": "shared/operators.json",
+    "otherAndUnknownSelectionAvailable": true,
+    "canonicalStorageAndDisplayNames": true,
+    "selectionCheckedAt": "2026-10-16T09:13:44.795Z",
+    "explicitOperatorContext": "Exact five-digit numeric QR plus selectedOperatorId=beam: source operator-selection, not automatic company detection",
+    "localPhotoPreprocessing": "Original and downscaled images, centered/overlapping regions and luminance thresholds; no original photo changes/uploads",
+    "manualEditsCancelPendingDecodeAndLookup": true
+  },
+  "operatorNameNormalization": {
+    "appliedOn": "2026-10-16",
+    "changed": 1,
+    "remainingKnownAliases": 0,
+    "customReportsPreserved": 3,
+    "totalReportsAtCheck": 4,
+    "backup": "/var/backups/parkick/operator-names-20261016-selection-1.json",
+    "backupMode": "0600",
+    "changedColumnOnly": "reports.operator_name",
+    "submissionHashesStatusTimestampsPhotosPreserved": true
+  },
+  "relatedReportManagement": {
+    "deployedAt": "2026-10-16T13:48:29Z",
+    "checkedAt": "2026-10-16T13:48:54.246Z",
+    "sameTenantAndRegionRequired": true,
+    "knownOperatorAndDeviceRequired": true,
+    "distanceMeters": 100,
+    "timeWindowHours": 24,
+    "maxSelection": 100,
+    "directAnchorComparison": true,
+    "completedEventsSeparateIncidents": true,
+    "automaticSelectionOrMerge": false,
+    "originalReportsAndHistoriesRetained": true,
+    "atomicCompletionMethods": [
+      "COLLECTED",
+      "TOWED"
+    ],
+    "exactBatchReplayBeforeBoundedScan": true,
+    "regionalScanLimitPerQuery": 1000,
+    "unknownIdentityAndScanOverflowRequireIndividualHandling": true,
+    "productionVerification": "Authenticated candidate GET plus browser-only confirmation UI; persistence/rollback tested in dedicated local PostgreSQL",
+    "productionTestReportsCreatedOrCompleted": 0
+  },
+  "photoUploadOptimization": {
+    "deployed": true,
+    "maxLongEdgePixels": 2560,
+    "jpegQuality": 0.85,
+    "originalLimitBytes": 10485760,
+    "originalLimitPixels": 40000000,
+    "qrPhotoPathUnchanged": true,
+    "smallFilesNotUpscaled": true,
+    "previewAndUploadIdentical": true,
+    "retryBytesAndSubmissionIdentityStable": true,
+    "validation": "frontend lint/build and 10 unit tests; 43 browser regressions plus focused JPEG compatibility checks; 4 real PostgreSQL submission checks including rotated large JPEG; clean full Linux build and API readiness passed",
+    "actualPhotoMeasurements": [
+      {
+        "sample": "beam-1",
+        "original": {
+          "bytes": 2454139,
+          "width": 3024,
+          "height": 4032
+        },
+        "optimized": {
+          "bytes": 472699,
+          "width": 1920,
+          "height": 2560
+        },
+        "reductionPercent": 80.7,
+        "previewMatchesSubmission": true
+      },
+      {
+        "sample": "beam-2",
+        "original": {
+          "bytes": 2289795,
+          "width": 3024,
+          "height": 4032
+        },
+        "optimized": {
+          "bytes": 515897,
+          "width": 1920,
+          "height": 2560
+        },
+        "reductionPercent": 77.5,
+        "previewMatchesSubmission": true
+      },
+      {
+        "sample": "gcoo",
+        "original": {
+          "bytes": 2273945,
+          "width": 3024,
+          "height": 4032
+        },
+        "optimized": {
+          "bytes": 483669,
+          "width": 1920,
+          "height": 2560
+        },
+        "reductionPercent": 78.7,
+        "previewMatchesSubmission": true
+      },
+      {
+        "sample": "kakao",
+        "original": {
+          "bytes": 2606546,
+          "width": 3000,
+          "height": 4000
+        },
+        "optimized": {
+          "bytes": 346851,
+          "width": 1920,
+          "height": 2560
+        },
+        "reductionPercent": 86.7,
+        "previewMatchesSubmission": true
+      }
+    ],
+    "liveBrowserCheckedAt": "2026-10-16T16:05:31.086Z",
+    "measurementScope": "Desktop Chrome with 390px mobile viewport, actual supplied photos, all API writes intercepted; photo dimensions/bytes/rotation/visual readability and retries checked. Actual handset/network upload latency was not measured."
+  },
+  "requestedModoriCleanup": {
+    "completedAt": "2026-10-16T15:44:17.508Z",
+    "reportsDeleted": 3,
+    "photosDeleted": 3,
+    "linkedDatabaseRowsDeleted": 13,
+    "unrelatedReportsPreservedAtDeletion": 3,
+    "databaseAndPhotoAbsenceVerified": true,
+    "noReportOrPhotoBackupRetained": true,
+    "remainingModoriReportsAtFinalCheck": 0
+  }
+}

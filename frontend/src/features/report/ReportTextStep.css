@@ -1,0 +1,14 @@
+.report-text-step { display: grid; gap: 20px; }
+.report-generation { display: grid; gap: 12px; }
+.report-generation .ai-preview-note { margin-bottom: 0; }
+.report-generation-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.report-generation-actions .button { min-width: 0; }
+.report-proposal { display: grid; gap: 14px; border: 1px solid #ccddf1; border-radius: 10px; padding: 19px; background: #f7fbff; }
+.report-proposal > strong { font-size: 12px; color: #426787; }
+.report-proposal-text { white-space: pre-wrap; overflow-wrap: anywhere; color: #38516d; font-size: 13px; }
+.report-proposal > .button { justify-self: start; }
+.report-text-step .form-field { margin-bottom: 0; }
+.report-text-confirmation { color: #425b76; font-size: 12px; }
+.report-facts-notice { display: flex; align-items: flex-start; gap: 9px; }
+.report-generation .inline-error .button { margin-top: 10px; }
+@media (max-width: 420px) { .report-proposal { padding: 15px; } .report-generation-actions .button { padding-inline: 13px; font-size: 12px; } }

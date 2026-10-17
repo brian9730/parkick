@@ -1,0 +1,100 @@
+.admin-main, .admin-content, .admin-detail-main, .admin-detail-actions { min-width: 0; }
+.admin-dashboard-secondary { margin-top: 20px; }
+.admin-report-table { font-size: 12px; min-width: 820px; }
+.admin-report-table td { padding: 15px 13px; vertical-align: top; line-height: 1.7; color: #415773; }
+.admin-report-table th { font-size: 11px; }
+.admin-report-table td > small, .admin-report-metadata dd > small { display: block; margin-top: 4px; color: #6c819b; font-size: 11px; }
+.admin-report-id { color: #2366bd; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+a.admin-report-id:hover { text-decoration: underline; }
+.admin-address-cell { min-width: 150px; max-width: 260px; overflow-wrap: anywhere; }
+.admin-report-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.admin-report-tags > span { border-radius: 5px; background: #edf4fc; color: #466484; padding: 3px 7px; font-size: 11px; line-height: 1.5; }
+.admin-report-status { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.admin-report-status .status-badge { font-size: 11px; padding: 4px 7px; white-space: nowrap; }
+.admin-report-status > small, .admin-report-status > strong { font-size: 12px; color: #37785f; }
+.admin-report-filters { align-items: flex-end; }
+.admin-report-filters > .button { min-height: 40px; }
+.admin-report-filters .search-filter { min-width: 0; }
+.admin-pagination { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 22px 0; }
+.admin-pagination > span { color: #59718e; font-size: 13px; }
+.admin-detail-heading { margin-top: 16px; }
+.admin-detail-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(285px, 1fr); gap: 20px; align-items: start; }
+.admin-detail-main { display: grid; gap: 20px; }
+.admin-detail-status { margin-bottom: 20px; }
+.admin-report-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 0; }
+.admin-report-metadata dt { color: #72869d; font-size: 12px; margin-bottom: 6px; }
+.admin-report-metadata dd { margin: 0; font-size: 13px; color: #344e6c; line-height: 1.6; overflow-wrap: anywhere; }
+.admin-metadata-wide { grid-column: 1 / -1; }
+.admin-report-photos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.admin-report-photo { margin: 0; min-width: 0; }
+.admin-report-photo a { display: block; border-radius: 8px; overflow: hidden; background: #f0f4f9; }
+.admin-report-photo img { display: block; width: 100%; height: 180px; object-fit: contain; }
+.admin-report-photo figcaption { text-align: center; color: #71849a; font-size: 11px; margin-top: 8px; }
+.admin-photo-error { display: grid; place-content: center; justify-items: center; min-height: 180px; border-radius: 8px; background: #f0f4f9; color: #677e97; text-align: center; font-size: 12px; }
+.admin-report-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.9; font-size: 14px; color: #334e6d; }
+.admin-user-description { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e6edf6; }
+.admin-user-description h3 { font-size: 12px; color: #667e98; }
+.admin-report-history { list-style: none; margin: 0; padding: 0; }
+.admin-report-history > li { border-left: 2px solid #dce9f7; padding: 0 0 24px 16px; margin-left: 3px; }
+.admin-report-history > li:last-child { padding-bottom: 0; }
+.admin-history-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 9px; align-items: center; }
+.admin-history-heading > time, .admin-history-author { font-size: 12px; color: #778ba2; }
+.admin-history-note { border-radius: 7px; background: #f2f7fd; padding: 12px; margin-top: 10px; }
+.admin-history-note.internal { background: #f4f5f7; }
+.admin-history-note > strong { color: #5b7390; font-size: 11px; }
+.admin-history-note > p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.8; margin: 5px 0 0; }
+.admin-status-form .panel-heading p { line-height: 1.7; }
+.admin-status-form .form-field { margin: 18px 0; }
+.admin-status-form textarea { min-height: 86px; resize: vertical; }
+.admin-status-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+.admin-status-actions .button { flex: 1 1 125px; }
+.admin-action-error { background: #fff2f2; border: 1px solid #f4d0d0; border-radius: 8px; padding: 14px; color: #9b4141; font-size: 13px; }
+.admin-action-error p { margin: 0 0 10px; line-height: 1.7; }
+.admin-action-success { border: 1px solid #b9e2cf; border-radius: 8px; background: #effaf4; color: #277153; padding: 14px; font-size: 13px; margin-bottom: 18px; }
+.admin-completed-panel { color: #277153; }
+.admin-completed-panel h2 { font-size: 18px; margin: 12px 0; }
+.admin-completed-panel p { font-size: 13px; line-height: 1.8; color: #5e7b6e; }
+.admin-confirm-dialog { box-sizing: border-box; width: min(480px, calc(100% - 32px)); max-height: calc(100dvh - 48px); border: 1px solid #dce6f2; border-radius: 14px; background: white; color: #344e6c; padding: 24px; box-shadow: 0 20px 80px #172b4a33; }
+.admin-confirm-dialog::backdrop { background: #14243e80; }
+.admin-confirm-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.admin-confirm-heading h2 { font-size: 18px; margin: 0; }
+.admin-confirm-dialog > p { font-size: 13px; line-height: 1.8; }
+.admin-confirm-notes { display: grid; gap: 14px; border-radius: 8px; background: #f5f8fc; padding: 16px; }
+.admin-confirm-notes dt { color: #667e98; font-size: 12px; }
+.admin-confirm-notes dd { margin: 6px 0 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.admin-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.admin-related-panel .panel-heading p { line-height: 1.7; }
+.admin-related-toolbar { display: flex; justify-content: flex-end; margin: 12px 0; }
+.admin-related-anchor { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 14px; border-radius: 8px; background: #edf5ff; font-size: 12px; line-height: 1.7; }
+.admin-related-anchor > strong { flex-basis: 100%; color: #385c85; }
+.admin-related-anchor > time { color: #647c97; }
+.admin-related-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 10px; }
+.admin-related-list > li { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 12px; border: 1px solid #dde7f3; border-radius: 8px; padding: 14px; }
+.admin-related-select { display: flex; gap: 7px; align-items: flex-start; font-size: 12px; padding-top: 3px; cursor: pointer; }
+.admin-related-select input { width: 17px; height: 17px; margin: 0; accent-color: #2268c8; flex-shrink: 0; }
+.admin-related-summary { min-width: 0; overflow-wrap: anywhere; }
+.admin-related-summary .admin-report-status { margin-top: 7px; font-size: 12px; }
+.admin-related-summary > p { font-size: 12px; line-height: 1.7; margin: 7px 0; }
+.admin-related-summary > p > strong { white-space: nowrap; font-weight: 500; color: #55718f; }
+.admin-related-summary > time { font-size: 11px; color: #7388a0; }
+.admin-related-count { font-size: 13px; font-weight: 600; color: #305d94; }
+.admin-related-panel .form-field { margin-top: 16px; }
+.admin-related-panel textarea { resize: vertical; }
+.admin-related-panel > .admin-action-error { margin-top: 16px; }
+.admin-related-confirm-ids { max-height: 180px; overflow-y: auto; padding: 12px 12px 12px 30px; border-radius: 8px; background: #f1f6fd; }
+.admin-related-confirm-ids li { padding: 3px 0; }
+.admin-related-confirm-ids small { display: block; color: #6a8099; font-size: 11px; }
+@media (max-width: 1100px) { .admin-detail-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) {
+  .admin-report-filters { gap: 12px; }
+  .admin-report-filters .filter-field, .admin-report-filters .search-filter { flex: 1 1 100%; width: 100%; }
+  .admin-report-filters > .button { flex: 1; }
+  .admin-report-photos { grid-template-columns: minmax(0, 1fr); }
+  .admin-report-photo img { height: 240px; }
+  .admin-detail-grid, .admin-detail-main { gap: 15px; }
+  .admin-report-metadata { gap: 14px; }
+  .admin-confirm-dialog { padding: 20px; }
+  .admin-related-list > li { grid-template-columns: minmax(0, 1fr); }
+  .admin-related-confirm .admin-confirm-heading h2 { font-size: 16px; }
+  .admin-related-confirm .admin-confirm-actions { flex-wrap: wrap; }
+}

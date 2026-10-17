@@ -1,0 +1,16 @@
+.wizard-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.submission-service { margin-top: 20px; }
+.submission-service .button { margin-top: 10px; }
+.submission-progress { border: 1px solid #e1e8f2; border-radius: 16px; padding: 30px; width: min(420px, calc(100% - 40px)); color: #273f5d; text-align: center; box-shadow: 0 20px 60px #18345520; }
+.submission-progress::backdrop { background: #1c304a70; }
+.submission-progress > svg { color: #417cbd; margin-inline: auto; }
+.submission-progress h2 { font-size: 20px; margin-top: 16px; }
+.submission-progress p { font-size: 14px; line-height: 1.8; color: #63758d; margin-top: 10px; }
+.submission-upload-progress { margin-top: 20px; }
+.submission-upload-progress progress { display: block; width: 100%; height: 12px; accent-color: #417cbd; }
+.submission-progress .submission-upload-progress p { font-variant-numeric: tabular-nums; color: #273f5d; }
+.submission-progress .submission-wait-hint { font-size: 12px; }
+.receipt-card .report-summary { margin-bottom: 22px; }
+.receipt-card .report-summary dl > div { font-size: 13px; margin-block: 14px; }
+.receipt-card .receipt-id { font-weight: 700; color: #235d9e; overflow-wrap: anywhere; }
+.receipt-actions { display: grid; gap: 14px; margin-top: 22px; text-align: center; }

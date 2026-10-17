@@ -1,0 +1,33 @@
+{
+  "name": "parkick",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Parkick citizen reporting platform",
+  "workspaces": ["frontend", "backend"],
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "postinstall": "npm run db:generate --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "setup:local": "npm run setup:local --workspace backend",
+    "db:start": "npm run db:start --workspace backend",
+    "db:stop": "npm run db:stop --workspace backend",
+    "aws:check": "npm run aws:check --workspace backend",
+    "lint": "npm run lint --workspaces",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "test:e2e": "playwright test",
+    "test:map": "playwright test --config playwright.map.config.ts",
+    "test:submission": "playwright test --config playwright.submission.config.ts",
+    "test:admin": "playwright test --config playwright.admin.config.ts",
+    "test:admin:map": "playwright test --config playwright.admin-map.config.ts",
+    "test:database": "npm run test:database --workspace backend",
+    "check:schema": "npm run db:validate --workspace backend"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.0"
+  }
+}

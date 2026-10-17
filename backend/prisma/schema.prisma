@@ -1,0 +1,239 @@
+// Phase 4 persistence. Custom CHECK constraints are maintained in the SQL migration.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ReportStatus {
+  RECEIVED
+  PROCESSING
+  COMPLETED
+}
+
+enum ReportCompletionMethod {
+  COLLECTED
+  TOWED
+}
+
+enum AdminRole {
+  PLATFORM_ADMIN
+  TENANT_ADMIN
+}
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(80)
+  name      String   @db.VarChar(120)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  regions   Region[]
+  reports   Report[]
+  admins    Admin[]
+
+  @@map("tenants")
+}
+
+model Region {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  // Assigned by the server, not by the anonymous request. Local seed is not a jurisdiction.
+  code      String   @unique @db.VarChar(80)
+  name      String   @db.VarChar(120)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reports   Report[]
+
+  // The composite report FK prevents assigning a region from another tenant.
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@map("regions")
+}
+
+model Admin {
+  id               String                @id @default(uuid()) @db.Uuid
+  email            String                @unique @db.VarChar(254)
+  passwordHash     String                @map("password_hash")
+  name             String                @db.VarChar(80)
+  active           Boolean               @default(true)
+  // Always explicit: never grant platform access through a default role.
+  // SQL CHECK requires a tenant for TENANT_ADMIN and no tenant for PLATFORM_ADMIN.
+  // Actual request authorization is implemented with production auth in Phase 6.
+  role             AdminRole
+  tenantId         String?               @map("tenant_id") @db.Uuid
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  sessions         AdminSession[]
+  statusHistory    ReportStatusHistory[]
+  completedReports Report[]              @relation("ReportCompletedByAdmin")
+  tenant           Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@map("admins")
+}
+
+model AdminSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  adminId   String    @map("admin_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  admin     Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("admin_sessions")
+}
+
+model Operator {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String   @unique @db.VarChar(100)
+  active         Boolean  @default(true)
+  // Only verified QR metadata; no invented operator formats.
+  qrRuleMetadata Json?    @map("qr_rule_metadata")
+  reports        Report[]
+
+  @@map("operators")
+}
+
+model Report {
+  id                        String                   @id @default(uuid()) @db.Uuid
+  // Generated server-side using crypto randomness, independent of internal IDs.
+  publicId                  String                   @unique @map("public_id") @db.VarChar(64)
+  // One client-generated submission UUID per logical request; hash binds the canonical payload.
+  submissionId              String                   @unique @map("submission_id") @db.Uuid
+  submissionHash            String                   @map("submission_hash") @db.Char(64)
+  tenantId                  String                   @map("tenant_id") @db.Uuid
+  regionId                  String                   @map("region_id") @db.Uuid
+  operatorId                String?                  @map("operator_id") @db.Uuid
+  operatorName              String?                  @map("operator_name") @db.VarChar(80)
+  deviceId                  String?                  @map("device_id") @db.VarChar(120)
+  qrRawData                 String?                  @map("qr_raw_data")
+  latitude                  Decimal                  @db.Decimal(9, 6)
+  longitude                 Decimal                  @db.Decimal(10, 6)
+  address                   String?                  @db.VarChar(500)
+  userDescription           String?                  @map("user_description")
+  aiGeneratedText           String?                  @map("ai_generated_text")
+  finalReportText           String                   @map("final_report_text")
+  // Optional contact: all seven phone/consent fields are null when no phone is supplied.
+  // If supplied, all seven are required; enforced in the service + migration CHECK.
+  // Phone-based lookup matches submitted numbers without OTP or identity verification.
+  // AES-GCM envelope (nonce+ciphertext+tag) + key version; keys never enter the DB.
+  contactPhoneCipher        Bytes?                   @map("contact_phone_cipher")
+  phoneEncryptionKeyVersion String?                  @map("phone_encryption_key_version") @db.VarChar(80)
+  // Keyed HMAC-SHA-256 of normalized phone; plain SHA256 allows enumeration.
+  phoneIdentifier           String?                  @map("phone_identifier") @db.Char(64)
+  phoneHmacKeyVersion       String?                  @map("phone_hmac_key_version") @db.VarChar(80)
+  contactPhoneMasked        String?                  @map("contact_phone_masked") @db.VarChar(24)
+  consentVersion            String?                  @map("consent_version") @db.VarChar(80)
+  consentedAt               DateTime?                @map("consented_at") @db.Timestamptz(3)
+  status                    ReportStatus             @default(RECEIVED)
+  createdAt                 DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Migration CHECK: COMPLETED requires all three completion fields;
+  // unfinished reports require all three to be null. Actor/time are server-assigned.
+  completedAt               DateTime?                @map("completed_at") @db.Timestamptz(3)
+  completionMethod          ReportCompletionMethod?  @map("completion_method")
+  // Administrator who recorded completion, not necessarily the collection/towing worker.
+  completedByAdminId        String?                  @map("completed_by_admin_id") @db.Uuid
+  completedByAdmin          Admin?                   @relation("ReportCompletedByAdmin", fields: [completedByAdminId], references: [id], onDelete: Restrict)
+  tenant                    Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  region                    Region                   @relation(fields: [regionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  operator                  Operator?                @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  images                    ReportImage[]
+  categories                ReportCategoryRelation[]
+  statusHistory             ReportStatusHistory[]
+  aiGenerations             ReportAIGeneration[]
+
+  @@index([phoneIdentifier, phoneHmacKeyVersion, createdAt])
+  @@index([status, createdAt])
+  @@index([operatorId, createdAt])
+  @@index([tenantId, status, createdAt])
+  @@index([regionId, tenantId, createdAt])
+  @@map("reports")
+}
+
+model ReportImage {
+  id          String   @id @default(uuid()) @db.Uuid
+  reportId    String   @map("report_id") @db.Uuid
+  objectKey   String   @unique @map("object_key") @db.VarChar(1024)
+  mimeType    String   @map("mime_type") @db.VarChar(32)
+  sizeBytes   Int      @map("size_bytes")
+  sha256      String?  @db.Char(64)
+  exifRemoved Boolean  @default(false) @map("exif_removed")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("report_images")
+}
+
+model ReportCategory {
+  id        String                   @id @default(uuid()) @db.Uuid
+  code      String                   @unique @db.VarChar(80)
+  name      String                   @unique @db.VarChar(100)
+  active    Boolean                  @default(true)
+  sortOrder Int                      @default(0) @map("sort_order")
+  reports   ReportCategoryRelation[]
+
+  @@map("report_categories")
+}
+
+model ReportCategoryRelation {
+  reportId   String         @map("report_id") @db.Uuid
+  categoryId String         @map("category_id") @db.Uuid
+  report     Report         @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  category   ReportCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([reportId, categoryId])
+  @@index([categoryId])
+  @@map("report_category_relations")
+}
+
+model ReportStatusHistory {
+  id               String                  @id @default(uuid()) @db.Uuid
+  reportId         String                  @map("report_id") @db.Uuid
+  previousStatus   ReportStatus?           @map("previous_status")
+  newStatus        ReportStatus            @map("new_status")
+  // Required only for COMPLETED events; recorded atomically with the report update.
+  completionMethod ReportCompletionMethod? @map("completion_method")
+  // Null only for system-created initial RECEIVED event; transitions require an admin.
+  adminId          String?                 @map("admin_id") @db.Uuid
+  internalNote     String?                 @map("internal_note")
+  // Public response serialization must select this explicitly, never internalNote.
+  publicNote       String?                 @map("public_note")
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  report           Report                  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  admin            Admin?                  @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([reportId, createdAt])
+  @@map("report_status_history")
+}
+
+model ReportAIGeneration {
+  id             String    @id @default(uuid()) @db.Uuid
+  // Generation precedes submission. Future service must verify draft ownership before attaching.
+  reportId       String?   @map("report_id") @db.Uuid
+  draftTokenHash String?   @map("draft_token_hash") @db.Char(64)
+  // Converse accepts model IDs and inference-profile ARNs up to 2048 characters.
+  modelId        String    @map("model_id") @db.VarChar(2048)
+  promptVersion  String    @map("prompt_version") @db.VarChar(80)
+  generatedText  String    @map("generated_text")
+  finalUserText  String?   @map("final_user_text")
+  wasEdited      Boolean?  @map("was_edited")
+  // Null until measured or returned by the provider; no made-up research metrics.
+  latencyMs      Int?      @map("latency_ms")
+  inputTokens    Int?      @map("input_tokens")
+  outputTokens   Int?      @map("output_tokens")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(3)
+  report         Report?   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, createdAt])
+  @@index([draftTokenHash])
+  @@map("report_ai_generations")
+}

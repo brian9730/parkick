@@ -1,0 +1,56 @@
+{
+  "name": "@parkick/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "prisma generate && tsc -p tsconfig.json && tsx scripts/copy-prisma-engine.ts",
+    "start": "node dist/server.js",
+    "aws:check": "tsx scripts/check-aws.ts",
+    "lint": "eslint .",
+    "test": "tsx --test test/*.test.ts",
+    "db:validate": "prisma validate",
+    "db:generate": "prisma generate",
+    "db:format": "prisma format",
+    "db:start": "tsx scripts/local-postgres.ts start",
+    "db:stop": "tsx scripts/local-postgres.ts stop",
+    "env:local": "tsx scripts/setup-local-env.ts",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "setup:local": "npm run env:local && tsx scripts/assert-local-database.ts && npm run db:start && npm run db:generate && npm run db:deploy && npm run db:seed",
+    "test:database": "tsx --test test/*-database.integration.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1149.0",
+    "@aws-sdk/client-s3": "^3.1152.0",
+    "@aws-sdk/s3-request-presigner": "^3.1152.0",
+    "@prisma/client": "6.19.3",
+    "cookie": "^1.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "multer": "^2.4.0",
+    "sharp": "^0.35.5",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^22.19.0",
+    "@types/supertest": "^6.0.3",
+    "eslint": "^9.39.1",
+    "prisma": "6.19.3",
+    "supertest": "^7.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.56.0"
+  }
+}

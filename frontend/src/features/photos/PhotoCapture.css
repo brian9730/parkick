@@ -1,0 +1,10 @@
+.photo-capture { display: grid; gap: 14px; }
+.photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.photo-item { overflow: hidden; border: 1px solid #dbe5ef; border-radius: 10px; background: #fff; min-width: 0; }
+.photo-item > img { width: 100%; height: 160px; object-fit: cover; background: #fff; }
+.photo-item-caption { display: flex; justify-content: space-between; gap: 6px; padding: 12px 12px 0; font-size: 11px; color: #78899f; }
+.photo-item-caption strong { color: #384f6c; }
+.photo-item-actions { display: flex; flex-wrap: wrap; padding: 3px 4px 5px; }
+.photo-item-actions .button { flex: 1; min-height: 38px; padding: 8px 7px; font-size: 11px; gap: 5px; }
+.photo-capture > [role="status"] { display: flex; align-items: center; gap: 6px; }
+@media (max-width: 420px) { .photo-item > img { height: 125px; } .photo-item-actions .button { font-size: 10px; padding-inline: 4px; } }

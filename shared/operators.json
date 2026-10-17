@@ -1,0 +1,8 @@
+[
+  { "id": "gcoo", "name": "지쿠", "aliases": ["지쿠터", "GCOO", "Gbike", "지바이크"] },
+  { "id": "beam", "name": "빔", "aliases": ["Beam", "빔모빌리티"] },
+  { "id": "kakao-bike", "name": "카카오 T 바이크", "aliases": ["카카오", "카카오바이크", "카카오 바이크", "카카오T바이크", "카카오 T바이크", "Kakao Bike", "Kakao T Bike"] },
+  { "id": "elecle", "name": "쏘카 일레클", "aliases": ["일레클", "쏘카일레클", "Elecle", "Socar Elecle"] },
+  { "id": "alpaca", "name": "알파카", "aliases": ["Alpaca"] },
+  { "id": "swing", "name": "스윙", "aliases": ["Swing", "더스윙"] }
+]

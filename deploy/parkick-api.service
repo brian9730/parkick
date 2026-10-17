@@ -1,0 +1,44 @@
+[Unit]
+Description=Parkick API
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=parkick
+Group=parkick
+WorkingDirectory=/srv/parkick/app/backend
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/parkick/backend.env
+ExecStart=/usr/bin/env node /srv/parkick/app/backend/dist/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillSignal=SIGTERM
+UMask=0077
+
+StateDirectory=parkick
+StateDirectoryMode=0700
+# Includes the private persistent photo directory, /var/lib/parkick/reports.
+ReadWritePaths=/var/lib/parkick
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=parkick-api
+
+[Install]
+WantedBy=multi-user.target
