@@ -1,10 +1,356 @@
 {
-  "checkedOn": "2026-10-17",
+  "checkedOn": "2026-10-25",
+  "currentRelease": {
+    "path": "/srv/parkick/releases/20261025-collection-field-1",
+    "applicationLink": "/srv/parkick/app",
+    "previousRelease": "/srv/parkick/releases/20261025-admin-rejected-1",
+    "health": "ok; photoValidation=litellm; storage=private-s3",
+    "rejectionVerification": "Live HTTPS browser confirmed management rejection count and detail rejection action using intercepted API responses; production database reads confirmed dashboard and rejected filter; no report rows were changed by verification",
+    "navigationVerification": "Live HTTPS browser confirmed desktop top navigation, management/collection mode switch, responsive widths and mobile drawer without page errors; production API remained healthy",
+    "collectionListFocusVerification": "Live HTTPS browser confirmed list selection opens the matching map information window on desktop and scrolls the map into view on mobile; actual NAVER tiles loaded and no page errors occurred",
+    "collectionFieldVerification": "Live HTTPS mobile browser with all admin API calls intercepted: 4/4 checks passed for list-first map toggle, detail return, evidence/action order, rejection reason, completion return and moving-location watch cleanup; no production report writes"
+  },
+  "collectionFieldDeployment": {
+    "release": "/srv/parkick/releases/20261025-collection-field-1",
+    "previousRelease": "/srv/parkick/releases/20261025-admin-rejected-1",
+    "status": "active on EC2; frontend lint, production build, 16 unit tests, API readiness and 4 live HTTPS mocked mobile browser checks passed",
+    "change": "Mobile collection queue shows nearest reports first with an on-demand map, preserves queue page/focus/scroll after detail and status updates, links walking/driving to NAVER Maps app, refreshes GPS while collection mode is visible, places photos before field actions, offers optional QR recheck, and requires a public reason when rejecting a missing device",
+    "sourceArchiveSha256": "63d8ed3341e8bfa2a94461a6029111df0595819f35d28458be6128695f6b6726",
+    "backendAndDatabase": "unchanged; old release preserved for code rollback",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "testReportsCreatedInProduction": 0
+  },
+  "adminRejectionDeployment": {
+    "release": "/srv/parkick/releases/20261025-admin-rejected-1",
+    "previousRelease": "/srv/parkick/releases/20261025-admin-top-nav-1",
+    "status": "active on EC2; backend/frontend build and lint, isolated PostgreSQL integration tests, production reads, API health and live HTTPS mocked browser check passed",
+    "change": "Management dashboard replaces the processing metric with rejected, renames received wait to received, and report detail can save a terminal rejected status; legacy processing reports remain readable and can be rejected",
+    "databaseMigration": "20261025000000_report_rejected_status adds REJECTED to ReportStatus without rewriting existing reports",
+    "databaseBackup": "/var/backups/parkick/admin-rejected-20261025-1/parkick-before-rejected.dump; pg_restore list and SHA256 verified",
+    "isolatedDatabaseIntegrationTests": "18/18 passed after applying initial and rejected-status migrations to a separate local PostgreSQL cluster on EC2",
+    "backendUnitTests": "156/156 passed on EC2",
+    "frontendValidation": "lint and production build passed on EC2",
+    "productionReadOnlyQueries": "staged backend dashboard and status=REJECTED list succeeded against production DB; no report rows changed",
+    "liveBrowserCheck": "actual HTTPS page with intercepted administrator API confirmed rejection metric and detail action; PATCH was intercepted, no production report write, no browser runtime errors",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "testReportsCreatedInProduction": 0
+  },
+  "adminTopNavigationDeployment": {
+    "release": "/srv/parkick/releases/20261025-admin-top-nav-1",
+    "previousRelease": "/srv/parkick/releases/20261025-admin-list-focus-1",
+    "status": "active on EC2; frontend lint and build, API health and live HTTPS responsive browser checks passed",
+    "change": "Show existing admin navigation in the desktop header; keep the hamburger-controlled sidebar for widths up to 1050px",
+    "changedSourceFiles": ["frontend/src/styles.css"],
+    "databaseMigration": false,
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "liveBrowserCheck": "Mocked read-only admin API confirmed desktop top navigation at 1440px and 1051px, mobile drawer at 1050px and 390px, management/collection mode, no horizontal overflow or page errors",
+    "releasePreparation": "Copied source without npm and Prisma caches; hard-linked unchanged dependency files after removing the staged node_modules cache; prior releases retained; no npm install in staged release",
+    "diskAvailableKiBAfterDeploy": 1626308,
+    "testReportsCreated": 0
+  },
+  "adminListFocusDeployment": {
+    "release": "/srv/parkick/releases/20261025-admin-list-focus-1",
+    "previousRelease": "/srv/parkick/releases/20261025-admin-sidebar-1",
+    "status": "historical release; frontend lint and build, API health and live HTTPS browser check passed",
+    "change": "Clicking a collection queue item centers and zooms the NAVER map on that report and opens its information popup; report detail remains a separate link",
+    "changedSourceFiles": ["frontend/src/features/admin/AdminNaverReportMap.tsx", "frontend/src/features/admin/CollectionMode.tsx", "frontend/src/features/admin/CollectionMode.css"],
+    "databaseMigration": false,
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "liveBrowserCheck": "Two mocked read-only reports on actual HTTPS; clicked the second item twice, confirmed only its popup and detail link, then selected the first item on mobile and confirmed the map scrolls into view; NAVER tiles and location marker loaded, no horizontal overflow or page errors",
+    "testReportsCreated": 0
+  },
+  "adminSidebarDeployment": {
+    "release": "/srv/parkick/releases/20261025-admin-sidebar-1",
+    "previousRelease": "/srv/parkick/releases/20261025-admin-collection-mode-1",
+    "status": "historical release; frontend lint and build, API health and live HTTPS browser checks passed",
+    "change": "Restore the previous fixed desktop sidebar and breadcrumb while keeping the current dashboard, collection mode, account menu and mobile drawer",
+    "changedSourceFiles": ["frontend/src/components/AdminLayout.tsx", "frontend/src/styles.css"],
+    "databaseMigration": false,
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "liveBrowserCheck": "Mocked admin API confirmed desktop sidebar, collection mode, mobile drawer, no horizontal overflow at 1440/1051/390 widths and zero page errors; no production API writes",
+    "testReportsCreated": 0
+  },
+  "adminCollectionModeDeployment": {
+    "release": "/srv/parkick/releases/20261025-admin-collection-mode-1",
+    "previousRelease": "/srv/parkick/releases/20261024-admin-collect-area-1",
+    "status": "historical release; npm ci, frontend/backend lint and build, API health and browser checks passed",
+    "change": "Add management/collection mode switch, current-location map and nearest-first list of open reports with operator, device, address, category and straight-line distance",
+    "databaseMigration": false,
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "reportAvailability": "available=true; mode=s3",
+    "readOnlyNearbyQuery": "Platform admin scope returned 8 open reports sorted by distance, with no database writes",
+    "authorization": "Unauthenticated nearby endpoint returned HTTP 401",
+    "liveBrowserCheck": "Deployed HTTPS dashboard and two mode-switch browser tests passed with mocked admin API and geolocation; real NAVER map tile, report marker and current-location marker loaded without page errors",
+    "testReportsCreated": 0
+  },
+  "adminCollectAreaDeployment": {
+    "release": "/srv/parkick/releases/20261024-admin-collect-area-1",
+    "previousRelease": "/srv/parkick/releases/20261024-mobile-steps-7",
+    "status": "historical release; frontend lint and build, API health and mock-API live HTTPS browser check passed",
+    "change": "Remove new towing completion actions from individual and related-report admin forms; show a municipality derived from the submitted address for demo-region reports, without changing database tenant/region or historical towing records",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "reportAvailability": "available=true; mode=s3",
+    "liveBrowserCheck": "Deployed HTML/JS/CSS returned 200; mocked Yongin demo report showed 경기도 용인 with no demo text, one collect action and no towing action, related-report collection confirmation; zero page errors and no production API writes",
+    "testReportsCreated": 0
+  },
+  "mobileStepsNoScrollDeployment": {
+    "release": "/srv/parkick/releases/20261024-mobile-steps-7",
+    "previousRelease": "/srv/parkick/releases/20261024-mobile-steps-6",
+    "status": "historical release; HTTPS health and live mobile browser verification passed without CSS injection",
+    "change": "On the report page only, hide the mobile footer, redundant outro and step note and remove excess bottom padding; correct the CSS specificity so no-scroll works in the deployed build",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "liveViewportHeights": [844, 667],
+    "liveStatesWithPageHeightExactlyViewportHeight": ["qrIdle", "qrManual", "qrOtherOperator", "locationNormalGps", "categoryRegular", "categoryOther"],
+    "liveMobileStepTransitionsPreScrollY": 0,
+    "live390x844NextBottomPx": {
+      "qrIdle": 797,
+      "qrManual": 744,
+      "qrOtherOperator": 817,
+      "location": 793,
+      "categoryRegular": 658,
+      "categoryOther": 756
+    },
+    "live390x667NextBottomPx": {
+      "qrIdle": 588,
+      "qrManual": 619,
+      "qrOtherOperator": 619,
+      "location": 608,
+      "categoryRegular": 553,
+      "categoryOther": 641
+    },
+    "horizontalOverflow": false,
+    "normalLocationMapVisible": true,
+    "normalLocationCoordinateCardAndManualInputVisible": false,
+    "testReportsCreated": 0
+  },
+  "mobileStepsFooterIntermediateDeployment": {
+    "release": "/srv/parkick/releases/20261024-mobile-steps-6",
+    "previousRelease": "/srv/parkick/releases/20261024-mobile-steps-5",
+    "status": "historical intermediate release; superseded by active -7",
+    "issueFoundInLiveBrowser": "At 390x844 the report page still had 38px bottom padding and document height 853px; -7 corrected CSS specificity"
+  },
+  "mobileStepsSafeAreaDeployment": {
+    "release": "/srv/parkick/releases/20261024-mobile-steps-5",
+    "previousRelease": "/srv/parkick/releases/20261024-mobile-steps-4",
+    "status": "historical intermediate release; superseded by active -7 after its full-document no-scroll check",
+    "change": "Apply the short-screen two-column other-operator form to all mobile viewport heights for more space below the QR step",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "liveMobileStepTransitionsPreScrollY": 0,
+    "live390x844NextBottomPx": {
+      "qrIdle": 797,
+      "qrManual": 744,
+      "qrOtherOperator": 817,
+      "location": 793,
+      "categoryRegular": 658,
+      "categoryOther": 756
+    },
+    "live390x667NextBottomPx": {
+      "qrIdle": 588,
+      "qrManual": 619,
+      "qrOtherOperator": 619,
+      "location": 608,
+      "categoryRegular": 553,
+      "categoryOther": 641
+    },
+    "horizontalOverflow": false,
+    "normalLocationMapVisible": true,
+    "normalLocationCoordinateCardAndManualInputVisible": false,
+    "testReportsCreated": 0
+  },
+  "mobileStepsShortOperatorDeployment": {
+    "release": "/srv/parkick/releases/20261024-mobile-steps-4",
+    "previousRelease": "/srv/parkick/releases/20261024-mobile-steps-3",
+    "status": "historical intermediate release; superseded by active -5 after its HTTPS health and mobile browser checks",
+    "change": "On short mobile screens, the manual operator selector and other-operator name field share a row so the QR step remains visible without scrolling",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "liveMobileStepTransitionsPreScrollY": 0,
+    "live390x844NextBottomPx": {
+      "qrIdle": 797,
+      "qrManual": 744,
+      "qrOtherOperator": 839,
+      "location": 793,
+      "categoryRegular": 658,
+      "categoryOther": 756
+    },
+    "live390x667NextBottomPx": {
+      "qrIdle": 588,
+      "qrManual": 619,
+      "qrOtherOperator": 619,
+      "location": 608,
+      "categoryRegular": 553,
+      "categoryOther": 641
+    },
+    "horizontalOverflow": false,
+    "normalLocationMapVisible": true,
+    "normalLocationCoordinateCardAndManualInputVisible": false,
+    "testReportsCreated": 0
+  },
+  "mobileStepsTransitionDeployment": {
+    "release": "/srv/parkick/releases/20261024-mobile-steps-3",
+    "previousRelease": "/srv/parkick/releases/20261024-mobile-steps-2",
+    "status": "historical intermediate release; superseded by active -4 after its HTTPS health and mobile browser checks",
+    "change": "On mobile step transitions, focus the heading without automatic smooth scrolling and reset the page to the top",
+    "reason": "The -2 location screenshot could omit the page header after step navigation, so final no-scroll measurement includes the header at scroll position zero",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "liveMobileStepTransitionsPreScrollY": 0,
+    "live390x844NextBottomPx": {
+      "qrIdle": 797,
+      "qrManual": 744,
+      "location": 793,
+      "categoryRegular": 658,
+      "categoryOther": 756
+    },
+    "live390x667NextBottomPx": {
+      "qrIdle": 588,
+      "qrManual": 619,
+      "location": 608,
+      "categoryRegular": 553,
+      "categoryOther": 641
+    },
+    "horizontalOverflow": false,
+    "normalLocationMapVisible": true,
+    "normalLocationCoordinateCardAndManualInputVisible": false,
+    "testReportsCreated": 0
+  },
+  "mobileStepsDeployment": {
+    "release": "/srv/parkick/releases/20261024-mobile-steps-2",
+    "previousRelease": "/srv/parkick/releases/20261024-mobile-steps-1",
+    "status": "historical intermediate release; superseded by active -3 after its API health and final live viewport checks",
+    "mobileViewport": "390x844 and 390x667; QR, location and category steps compacted to keep the Next button visible without scrolling",
+    "liveBrowserAfterCssInjectionBeforeRelease2": {
+      "390x844NextBottom": "QR idle 797px, QR manual 744px, location 813px, category regular 658px, category other 756px",
+      "390x667NextBottom": "QR idle 588px, QR manual 619px, location 618px, category regular 540px, category other 628px",
+      "scope": "CSS injected into the live browser before -2 deployment; these measurements are not a verification of the -2 build"
+    },
+    "locationStep": "GPS starts automatically; the coordinate and accuracy card is removed; manual latitude and longitude appear only after GPS, NAVER SDK or map rendering failure; map pin, address lookup, address editing and GPS refresh remain available",
+    "localMapValidation": "10 map-feature browser cases printed ok, including a full-viewport normal GPS and reverse-geocoded address case; Windows Playwright teardown required interruption after the results",
+    "productionReportCreated": false
+  },
+  "photoTwoDeployment": {
+    "release": "/srv/parkick/releases/20261024-photo-two-1",
+    "previousRelease": "/srv/parkick/releases/20261024-report-title-1",
+    "newReportMaxPhotos": 2,
+    "legacyThirdS3PhotoCleanupPreserved": true,
+    "compactGuidance": true,
+    "backendTests": "155/155 passed",
+    "frontendLintBuildAnd10Tests": "passed",
+    "focusedBrowserTests": "2 passed; Windows Playwright teardown required interruption after results",
+    "liveMobile390x844": "guidance and Next button visible with one or two photos",
+    "productionThreePhotoPrecheck": "HTTP 400 INVALID_MULTIPART",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "testReportsCreated": 0
+  },
+  "reportTitleDeployment": {
+    "release": "/srv/parkick/releases/20261024-report-title-1",
+    "previousRelease": "/srv/parkick/releases/20261023-photo-copy-1",
+    "visibleTitleRemoved": true,
+    "screenReaderTitlePreserved": true,
+    "mobileFirstCardMovedUpPixels": 104,
+    "frontendLintBuildAnd10Tests": "passed",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "testReportsCreated": 0
+  },
+  "photoCaptureCopyDeployment": {
+    "release": "/srv/parkick/releases/20261023-photo-copy-1",
+    "previousRelease": "/srv/parkick/releases/20261023-litellm-photo-1",
+    "removedHelperParagraphs": 3,
+    "frontendLintBuildAnd10Tests": "passed",
+    "liveMobilePhotoStepControlsAndCopy": "passed, read-only",
+    "productionHealth": "ok; photoValidation=litellm; storage=private-s3",
+    "testReportsCreated": 0
+  },
+  "integrationHandoff20261023": {
+    "adminReportedExistingS3PermissionsOnProfile": "SafeInstanceProfile-sgu-202686",
+    "ec2ProfileAttachedAtReadOnlyCheck": false,
+    "ec2ImdsIamInfo": "404",
+    "productionStorageModeAtReadOnlyCheck": "local",
+    "productionPhotoValidationMode": "disabled",
+    "internalLlmApi": "At this read-only check, the endpoint and key had not arrived; later on 2026-10-23 the LiteLLM HTTPS endpoint and key were provided and the proxy was tested locally",
+    "developerIamAccessKey": "not provided by administrator",
+    "completedAfterReadOnlyCheck": "associated the existing profile with EC2, verified Put/Get/Delete from EC2, migrated 6 photos, activated S3 while retaining local originals"
+  },
+  "liteLlmProxy": {
+    "checkedOn": "2026-10-23",
+    "baseUrl": "https://52.78.77.90",
+    "server": "LiteLLM 1.102.0 Swagger",
+    "tlsCertificateVerified": true,
+    "authenticationHeader": "x-litellm-api-key",
+    "credentialProvided": true,
+    "credentialStoredInThisFile": false,
+    "productionKeyConfigured": true,
+    "productionKeyFile": "/etc/parkick/backend.env",
+    "productionKeyFileOwnerAndMode": "root:parkick 0640",
+    "authenticatedModelsEndpoint": "/v1/models",
+    "authenticatedModelAliases": [
+      "bedrock-haiku",
+      "bedrock-sonnet",
+      "bedrock-gpt-5.6-luna"
+    ],
+    "syntheticImageRequest": {
+      "endpoint": "/v1/chat/completions",
+      "model": "bedrock-haiku",
+      "image": "synthetic apple JPEG",
+      "httpStatus": 200,
+      "result": "unrelated image decision in JSON wrapped by a Markdown code fence"
+    },
+    "localCodeValidation": "Backend 153/153 tests, TypeScript and ESLint passed; frontend production build, lint and 10/10 tests passed",
+    "ec2Release": {
+      "path": "/srv/parkick/releases/20261023-litellm-photo-1",
+      "frontendAndBackendBuild": "passed",
+      "availableBackendTestsOnLinux": "143/143 passed; this release has fewer test files than the local workspace",
+      "productionSymlinkSwitched": true
+    },
+    "productionConfiguration": {
+      "AI_PROVIDER": "litellm",
+      "LLM_API_BASE_URL": "https://52.78.77.90",
+      "LLM_API_KEY": "server-only secret omitted",
+      "LLM_REPORT_MODEL_ID": "bedrock-haiku"
+    },
+    "productionAiProvider": "litellm",
+    "activatedInParkickProduction": true,
+    "productionPreflight": {
+      "healthPhotoValidationMode": "litellm",
+      "healthStorage": "private-s3",
+      "reportStatusAvailable": true,
+      "reportStatusStorageMode": "s3",
+      "relevantPublicScooterPhoto": "HTTP 200 valid=true",
+      "unrelatedGeneratedRedJpeg": "HTTP 422 PHOTO_NOT_PM",
+      "sourcePhoto": "https://commons.wikimedia.org/wiki/File:Shared_electric_kick_scooters_in_Tomasz%C3%B3w_Mazowiecki,_Poland.jpg",
+      "reportsCreated": 0
+    },
+    "parkickReportFlowVerified": false,
+    "ec2DirectBedrockPermissionRequired": false,
+    "s3InstanceProfileUnchanged": true
+  },
+  "s3Migration20261023": {
+    "instanceProfileBeforeAssociation": "none; IMDSv2 iam/info returned 404",
+    "ec2InstanceProfileAttached": true,
+    "instanceProfileName": "SafeInstanceProfile-sgu-202686",
+    "associationId": "iip-assoc-0a7d3a8136ba4ba4b",
+    "associationState": "associated",
+    "serviceAwsCredentialsAvailable": true,
+    "databasePhotoRows": 6,
+    "localPhotoRowsBeforeMigration": 6,
+    "s3PhotoRowsAfterMigration": 6,
+    "localPhotosMatchingDatabaseSizeAndSha256": 6,
+    "localPhotoBytes": 12195775,
+    "migrationToolInstalledOnCurrentRelease": true,
+    "productionDryRunPlannedPhotosBeforeMigration": 6,
+    "localAndEc2RoleS3PermissionProbes": "Put/Get/byte-compare/Delete passed",
+    "backup": "/var/backups/parkick/s3-cutover-20261023-1; env, PostgreSQL dump and photo tar verified",
+    "manifest": "/var/lib/parkick/evidence-migration-20261023.json",
+    "productionMigrationApplied": true,
+    "migrationVerification": "6 S3 photo reads and hashes passed; independent S3EvidenceStorage signed URL GET for all 6 matched DB size and SHA-256 (12,195,775 bytes total); post-migration dry-run found 0 local DB keys",
+    "localOriginalsRetained": true,
+    "productionStorageMode": "s3",
+    "applicationAdapterCheck": "synthetic S3 upload, signed GET, SHA-256 comparison and delete passed",
+    "browserPhotoUiTested": false
+  },
   "region": "ap-northeast-2",
   "localProfile": "parkick",
   "initialDeploymentStorage": "private-local",
   "initialDeploymentPhotoDirectory": "/var/lib/parkick/reports",
-  "s3DeploymentDeferred": true,
+  "s3DeploymentDeferred": false,
   "applicationUrl": "https://15.165.235.154",
   "ec2": {
     "name": "sgu-202686-ec2",
@@ -23,7 +369,7 @@
     "rootDiskDeleteOnTermination": false,
     "cpuCreditMode": "standard",
     "imdsV2Required": true,
-    "iamProfileAttached": false,
+    "iamProfileAttached": true,
     "applicationInstalled": true,
     "postgresqlInstalled": true,
     "httpsConfigured": true,
@@ -57,7 +403,8 @@
   "https": {
     "certificateType": "Lets Encrypt IPv4 shortlived",
     "certbotVersion": "5.8.0",
-    "certificateExpiresAt": "2026-10-22T02:45:26Z",
+    "certificateExpiresAt": "2026-10-29T12:13:11Z",
+    "currentExternalTlsVerification": "HTTPS HTTP 200 with normal certificate verification (curl ssl_verify=0)",
     "renewalTimer": "snap.certbot.renew.timer",
     "renewalTimerEnabled": true,
     "renewalDryRunWithDeployHook": "passed"
@@ -131,32 +478,77 @@
     "relatedQrLocalChecks": "Frontend/backend lint and TypeScript passed; frontend production build passed. Local backend Prisma regeneration blocked by Windows DLL EPERM; isolated clean EC2 generation and full build passed.",
     "relatedQrLinuxBuild": "Clean npm ci and full frontend/backend build passed; schema/migrations unchanged, shared catalog and preserved configuration checked, API health and report intake ready",
     "relatedQrLiveBrowser": "Four original photos decoded correctly on actual HTTPS mobile UI; numeric Beam required explicit company selection. Authenticated related GET checked for six existing reports; browser-only synthetic selection/confirmation cancelled. Zero report creations/completions, photo uploads, runtime errors or vendor requests.",
-    "relatedQrLiveCheckedAt": "2026-10-16T13:48:54.246Z"
+    "relatedQrLiveCheckedAt": "2026-10-16T13:48:54.246Z",
+    "autoGpsQrLinuxBuild": "Clean npm ci and frontend/backend production build passed in the new EC2 release; schema and production map configuration unchanged",
+    "autoGpsQrLiveBrowser": "Production HTTPS mobile viewport: no development-service copy, automatic mocked device GPS pin and NAVER road address, refresh button visible; Swing, Alpaca and Elecle QR API cases passed; no reports submitted or runtime errors",
+    "autoGpsQrLiveCheckedAt": "2026-10-18T09:13:11Z",
+    "qrStepFrontend": "Frontend lint and production build passed",
+    "qrStepBrowser": "46 base, 8 map and 7 isolated PostgreSQL submission browser cases printed passed; Windows Playwright teardown hung after tests and was interrupted",
+    "qrStepLiveBrowser": "HTTPS mobile viewport showed zero QR-step checkboxes and advanced with Beam selected and a blank device number; no page errors or production submissions",
+    "qrStepLiveCheckedOn": "2026-10-22 KST"
   },
-  "activeRelease": {
+  "historicalLiteLlmRelease": {
     "phase": 6,
     "phase6Progress": "database administrator authentication, real dashboard/list/detail/evidence, collection/towing, report map and tenant-scoped authorization deployed; tenant account administration, jurisdiction assignment and detailed statistics remain pending",
-    "deployedAt": "2026-10-16T16:04:41.330Z",
-    "path": "/srv/parkick/releases/20261017-photo-upload-1",
+    "verifiedAt": "2026-10-23T07:21:14Z",
+    "deployedOn": "2026-10-23",
+    "path": "/srv/parkick/releases/20261023-litellm-photo-1",
     "applicationLink": "/srv/parkick/app",
-    "previousRelease": "/srv/parkick/releases/20261016-related-qr-1",
-    "sourceArchiveSha256": "e48f081af96fa1b579c7abefc7af59750ed795aa650504c9bb074a3ee26bca1f",
+    "previousRelease": "/srv/parkick/releases/20261023-s3-hybrid-ready-1",
+    "sourceArchiveSha256": null,
+    "previousReleaseSourceFileSha256": {
+      "backend/src/app.ts": "35748af88edd4108090fa681a2ce47279c524a01d1c034607cda210b576615bd",
+      "backend/src/config.ts": "e21bca17bbdb785b503dae267929ed888193d32b56dae14016e83ce649143053",
+      "backend/src/services/storage/HybridEvidenceStorage.ts": "8b758cb9185946bbc5ed11fe83b14e17c451b77c0f4078668ae75fb2434a122e"
+    },
+    "deploymentMethod": "New LiteLLM release built and tested on EC2; /srv/parkick/app symlink switched, private root:parkick 0640 environment activated with AI_PROVIDER=litellm; previous S3 release preserved",
     "changes": [
       "Database dashboard, filtered report lists, details and authenticated private evidence",
       "Platform administrator global access and tenant administrator scope on every report operation",
       "Processing, collection and towing completion with atomic actor/time/history and safe retries",
       "Public/internal notes with only public notes included in citizen lookup",
-      "Independent Bedrock region configuration and synthetic connection check CLI; production AI remains disabled",
+      "Independent Bedrock region configuration and synthetic connection check CLI remain available as the direct invocation alternative; production photo validation uses LiteLLM",
       "NAVER administrator dashboard and dedicated /admin/map with tenant-scoped coordinates, grouped markers, report popups, detail links, filters and pagination; map controls remain outside the canvas to avoid covering popups",
-      "Citizen reverse geocoding: 300ms debounce, preserve resolved addresses on step revisit, retry on failure/timeout and protect manual text. Actual NAVER address requests remain HTTP 403; application settings require confirmation.",
+      "Citizen reverse geocoding: 300ms debounce, preserve resolved addresses on step revisit, retry on failure/timeout and protect manual text. NAVER road address lookup succeeded in the 2026-10-18 production browser check with mocked device GPS.",
       "Administrator maps group nearby reports by 56 CSS pixels at current zoom; clicking a cluster zooms to separate coordinates, while exact duplicates and max-zoom overlaps expose all report details.",
       "Verified Kakao and Beam QR families identify operator and device; GCOO 08201 plus six digits identifies the printed number, while the older ten-digit token identifies only the operator. Five-digit QR fills a number only after explicit Beam selection. Local multiscale/contrast decoding and manual-edit cancellation protect the reporting flow.",
       "Single operator selector for six brands; shared catalog canonicalizes QR/manual submissions, AI input and legacy admin/public display/search. One recognized legacy name normalized with private backup; custom names preserved.",
       "Related unfinished reports retain separate records. Same tenant/region/operator/device within 100m and 24h are suggested, with completion boundaries separating incidents. Explicitly selected reports complete atomically with separate histories and exact-batch retry support.",
-      "Evidence photos are resized before upload to at most 2560px and JPEG quality 0.85, with EXIF orientation, stable retry bytes, small-file preservation, input validation and cancellation cleanup. QR decoding uses its existing separate path."
+      "Evidence photos are resized before upload to at most 2560px and JPEG quality 0.85, with EXIF orientation, stable retry bytes, small-file preservation, input validation and cancellation cleanup. QR decoding uses its existing separate path.",
+      "The location step automatically requests device GPS and reverses coordinates to a NAVER address; the location button refreshes GPS. Photo EXIF GPS is not used.",
+      "Verified Swing, Alpaca and Elecle QR formats identify canonical operator and printed device number; development-service wording is removed from the interface.",
+      "Demo tenant and region are both named 개발용 (시연 데이터), with duplicate list labels collapsed; the user-specified report and its one local photo were deleted.",
+      "QR step has no acknowledgement checkboxes; both operator and device number are required before continuing.",
+      "Five-step report flow removes the report-text step; the server derives a stored summary from selected categories.",
+      "Photo preflight and submission enforce image format, size and LiteLLM content relevance with AI_PROVIDER=litellm; direct EC2 Bedrock invocation remains inactive.",
+      "Server-side HTTPS LiteLLM adapter sends normalized JPEGs via x-litellm-api-key and parses JSON labels including fenced responses; frontend photo-validation copy follows the active mode.",
+      "EC2 instance profile associated; S3-mode writes active, 6 existing photo rows migrated and local originals retained for recovery."
     ],
+    "validation": {
+      "externalHttpsHealth": "passed: services.photoValidation=litellm, storage=private-s3; services.ai remains disabled for the legacy text generator",
+      "externalHttpsReportStatus": "passed: intake available=true, storage mode=s3",
+      "photoPreflight": "public shared scooter photo HTTP 200 valid=true; generated unrelated red JPEG HTTP 422 PHOTO_NOT_PM; no report created",
+      "nginx": "proxy_send_timeout and proxy_read_timeout 300s; nginx -t passed",
+      "liveBrowser": "historical 2026-10-22 check on previous disabled-AI release: read-only headless desktop Chrome with 390px mobile viewport on production HTTPS /report: STEP 01/05, manual Beam and device advanced to photo STEP 02/05, zero runtime errors; current LiteLLM frontend flow not yet browser-tested",
+      "liveReportSubmission": "not tested; no production report created",
+      "bedrockImageRelevance": "direct EC2 Bedrock invocation inactive and untested; active LiteLLM proxy preflight passed with relevant and unrelated images"
+    },
+    "hybridRollout20261023": {
+      "historicalPreCutoverCheck": true,
+      "backendUnitTests": "140 passed locally",
+      "backendLintAndTypes": "passed locally",
+      "backendBuildOnEc2": "passed",
+      "verifiedAt": "2026-10-23T04:31:02.682212Z",
+      "httpsHealth": "passed with valid certificate",
+      "httpsReportStatus": "available=true",
+      "productionStorageModeAtHybridRollout": "local",
+      "productionPhotoValidationMode": "disabled",
+      "ec2InstanceProfileAttachedAtHybridRollout": false,
+      "existingImageKeys": "6 local UUID/UUID.jpg; 0 S3 keys; 0 unknown patterns",
+      "databaseOrPhotoMutation": false
+    },
     "databaseMigrationsApplied": false,
-    "existingDatabasePhotosAndContactKeysPreserved": true,
+    "unrelatedDatabasePhotosAndContactKeysPreserved": true,
     "frontendConfigurationUpdate": {
       "deployedAt": "2026-10-16T07:12:57.380490Z",
       "scope": "frontend static build and reviewed public environment settings only; updated NAVER public Client ID",
@@ -167,6 +559,12 @@
       "historicalRelease": "/srv/parkick/releases/20261016-reverse-geocoding-1"
     },
     "preservedEarlierReleases": [
+      "/srv/parkick/releases/20261023-s3-hybrid-ready-1",
+      "/srv/parkick/releases/20261021-qr-step-1",
+      "/srv/parkick/releases/20261019-demo-label-1",
+      "/srv/parkick/releases/20261018-auto-gps-qr-1",
+      "/srv/parkick/releases/20261017-photo-upload-1",
+      "/srv/parkick/releases/20261016-related-qr-1",
       "/srv/parkick/releases/20261016-operator-selection-2",
       "/srv/parkick/releases/20261016-operator-selection-1",
       "/srv/parkick/releases/20261016-operator-qr-2",
@@ -203,7 +601,8 @@
     "checkedOn": "2026-10-15",
     "diskAvailableApproxGiB": 22,
     "photoDirectoryApproxMiB": 4.6,
-    "recommendation": "Keep the current EC2 deployment for testing; move photos to private S3 when the instance role is available and ongoing use grows. DB backup remains a separate requirement."
+    "recommendationAtCheck": "Keep the current EC2 deployment for testing; move photos to private S3 when the instance role is available and ongoing use grows. DB backup remains a separate requirement.",
+    "supersededBy": "2026-10-23 S3 cutover; EC2 retains web/API/PostgreSQL and local photo recovery copies"
   },
   "s3": {
     "bucket": "sgu-202686-s3",
@@ -212,14 +611,18 @@
     "objectOwnership": "BucketOwnerEnforced",
     "defaultEncryption": "AES256",
     "localPutGetDeleteCheck": "passed",
-    "ec2PutGetDeleteCheck": "not-run"
+    "ec2PutGetDeleteCheck": "passed as parkick service user with associated instance profile",
+    "activeStorageProvider": "s3",
+    "existingPhotosMigratedAndVerified": 6,
+    "localOriginalsRetained": true,
+    "versioningAtCheck": "not enabled/observed"
   },
   "remaining": [
     "Keep SSH TCP 22 at 0.0.0.0/0 per the user's latest instruction until they request a change; no automatic expiry is configured.",
     "Phase 6 remaining: tenant account administration, real municipality/region registration and jurisdiction assignment and detailed statistics.",
-    "Bedrock deferred: the EC2 execution profile is not attached. SafeInstanceProfile-sgu-202686 exists, but verify its trust and effective model permissions before connecting it. Existing Lambda is a DynamoDB-backed chatbot, not a drop-in report generator.",
+    "LiteLLM photo relevance is active in production. External HTTPS photo preflight accepted a public shared scooter image and rejected a generated unrelated JPEG; final S3-backed report submission with AI active and browser photo views remain unverified. The EC2 instance profile continues to serve S3; direct EC2 Bedrock invocation remains unverified.",
     "The public IP is not elastic; after an IP change update HTTPS and FRONTEND_ORIGIN before resuming service.",
-    "For a future S3 transition only: an administrator must prepare the EC2 instance role; iam:CreateRole was explicitly denied by SafePowerUser.",
+    "Verify existing photos in the authenticated administrator and citizen browser views and run an end-to-end new S3-backed report submission; synthetic storage and API readiness checks passed but these UI flows were not yet tested.",
     "Citizen Reverse Geocoding remains HTTP 403 after the new Client ID was rebuilt and deployed. Same-Application service selection and Web service URL require console verification; the exact cause is unconfirmed. Administrator report maps use stored coordinates."
   ],
   "administratorReportManagement": {
@@ -271,13 +674,14 @@
     "checkedOn": "2026-10-16",
     "requestedRegion": "us-east-1",
     "regionSetting": "BEDROCK_REGION, falling back to AWS_REGION; S3 continues to use AWS_REGION",
-    "productionProvider": "disabled",
-    "localCredentialCheck": "Later GetInferenceProfile retry could not create/refresh login credentials; AWS CLI suggested missing signin:CreateOAuth2Token. This is a credential refresh failure, not evidence of model invocation denial. Earlier Lambda/profile inspection remains recorded.",
+    "productionProvider": "litellm",
+    "historicalLocalCredentialCheck20261022": "GetInferenceProfile retry could not create/refresh login credentials; AWS CLI suggested missing signin:CreateOAuth2Token. This was a credential refresh failure, not evidence of model invocation denial. AWS CLI login succeeded on 2026-10-23 for S3 work; Bedrock model invocation remains untested.",
     "invokeModelPermissionVerified": false,
     "virginiaOnlyPolicyVerified": false,
     "actualModelInvocations": 0,
-    "ec2InstanceProfileAttached": false,
-    "ec2IamMetadataCheck": "IMDSv2 iam/info returned 404; DescribeInstances IamInstanceProfile null; running service has no AWS credential environment variables or service-user shared credential/config files",
+    "ec2InstanceProfileAttached": true,
+    "ec2IamMetadataBeforeS3Association": "IMDSv2 iam/info returned 404; DescribeInstances IamInstanceProfile null before the 2026-10-23 association",
+    "ec2ProfileNowProvidesS3Credentials": true,
     "connectionDeferred": true,
     "connectionCheckScript": "backend/scripts/check-bedrock.ts",
     "lambdaInspection": {
@@ -311,19 +715,20 @@
       "temperature": 0.7,
       "localCallerDryRunStatus": 204,
       "ec2CallerCredentialsAvailable": false,
-      "directPath": "EC2 role requires bedrock:InvokeModel on the selected inference profile and all destination models, plus bedrock:GetInferenceProfile on the profile",
+      "directPath": "EC2 role requires bedrock:InvokeModel on the selected inference profile and all destination models; bedrock:GetInferenceProfile is optional for inspection",
       "lambdaPath": "EC2 role requires lambda:InvokeFunction; Lambda role requires Bedrock and current DynamoDB access; EC2 permissions do not follow from local PC login",
       "codeModified": false
     },
-    "recommendedPath": "EC2 backend directly to Bedrock using the existing provider, after verifying and attaching an EC2 execution profile with the required model permissions",
+    "recommendedPath": "The administrator-provided LiteLLM HTTPS proxy is active for Parkick photo validation; direct EC2 Bedrock invocation remains an alternative after separately verifying model permissions and image calls",
     "existingInstanceProfile": {
       "name": "SafeInstanceProfile-sgu-202686",
       "role": "SafeRole-sgu-202686",
       "discovery": "ListInstanceProfilesForRole",
-      "attachedToParkickEc2": false,
+      "attachedToParkickEc2": true,
+      "s3ConnectionCheck": "temporary Put/Get/Delete passed from the EC2 parkick service account",
       "attachedBedrockPolicyName": "Shingu-AllowBedrockInvoke",
       "trustAndEffectivePermissionsVerified": false,
-      "inspectionLimit": "GetRole, GetRolePolicy, GetPolicyVersion and SimulatePrincipalPolicy were AccessDenied; no role or profile was modified or attached"
+      "inspectionLimit": "GetRole, GetRolePolicy, GetPolicyVersion and SimulatePrincipalPolicy were AccessDenied at earlier policy inspection; no Bedrock policy was modified. The existing profile was associated with EC2 on 2026-10-23 for S3."
     },
     "previousLocalCredentialCheck": "parkick browser login completed; local principal sgu-202686 can inspect Lambda and Invoke DryRun returned 204",
     "directInvocationPermissionsPlan": {
@@ -356,11 +761,11 @@
     "localSetting": "frontend/.env: VITE_NAVER_MAP_CLIENT_ID",
     "productionSetting": "/srv/parkick/app/frontend/.env.production: VITE_NAVER_MAP_CLIENT_ID",
     "configurationRequiresFrontendRebuild": true,
-    "checkedAt": "2026-10-16T07:16:57.818Z",
+    "checkedAt": "2026-10-18T09:13:11Z",
     "sdkHttpStatus": 200,
     "mapVisible": true,
     "loadedTiles": 9,
-    "addressLookup": "not operational after Client ID refresh: actual browser reverse geocoding still HTTP 403 with no structured provider error. Exact cause and console application service authorization remain unverified.",
+    "addressLookup": "operational in the production browser check: mocked device GPS coordinates returned a NAVER road address without pressing the location button",
     "authenticationFailureCallback": false,
     "browserRuntimeErrors": 0,
     "testUsedActualGps": false,
@@ -396,12 +801,13 @@
     "reverseGeocoding": {
       "frontendImplemented": true,
       "frontendDeployed": true,
-      "providerOperational": false,
-      "checkedAt": "2026-10-16T07:13:11.058Z",
-      "httpStatuses": [
+      "providerOperational": true,
+      "checkedAt": "2026-10-18T09:13:11Z",
+      "historicalHttpStatuses": [
         403,
         403
       ],
+      "latestResult": "NAVER road address populated automatically for mocked device GPS coordinates on production HTTPS",
       "addressPreference": [
         "roadAddress",
         "jibunAddress"
@@ -413,29 +819,28 @@
       "retryAfterFailureOrTimeout": true,
       "automaticRetry": false,
       "backendPrivateKeyRequired": false,
-      "consoleActionPending": "New public Client ID was rebuilt and deployed; verify Dynamic Map and Reverse Geocoding on that same NAVER Application and Web service URL https://15.165.235.154. Console settings cannot be inspected from this workspace.",
+      "consoleActionPending": null,
       "configurationChangeRequiresRebuild": "service selection and allowed URL changes do not change the deployed public ID; changing the Client ID requires a frontend rebuild"
     },
     "clientConfigurationUpdatedAt": "2026-10-16T07:12:57.380490Z",
-    "checkScope": "citizen report wizard after Client ID refresh; actual SDK, visible map and nine tiles; address API still 403"
+    "checkScope": "citizen report wizard on actual HTTPS with mocked browser geolocation, real NAVER SDK and successful road-address lookup; no real handset GPS or report submission"
   },
   "qrOperatorRecognition": {
-    "checkedAt": "2026-10-16T13:48:54.246Z",
+    "checkedAt": "2026-10-18T09:13:11Z",
     "deployed": true,
     "supportDocumentation": "deploy/qr-operator-support.md",
     "automaticOperatorAndDevice": [
       "kakao-bike-launch-v1: t.kakao.com launch with bike/qrcode and two-letter/four-digit ID",
       "beam-deeplink-v1: deeplink.ridebeam.com optional root slash with seven digits or two uppercase letters plus three digits",
-      "gcoo-open-v1: open.gbike.io b token with exact 08201 prefix plus six-digit printed number"
+      "gcoo-open-v1: open.gbike.io b token with exact 08201 prefix plus six-digit printed number",
+      "swing-qrcode-v1: qrcode.theswing.co.kr/swingapp.page.link with printed CL number",
+      "alpaca-qc-v1: go-sbike.com/qc/index.do with printed six-digit code",
+      "elecle-matrix-v1: matrix.elecle.bike/scan/qr with printed eight-digit serial number"
     ],
     "automaticOperatorOnly": [
       "gcoo-open-v1: open.gbike.io with ten-digit b token; deviceId is null"
     ],
-    "unverifiedOperators": [
-      "쏘카 일레클",
-      "알파카",
-      "스윙"
-    ],
+    "unverifiedOperators": [],
     "unverifiedForms": "Other numeric or URL/ID families require manual identification; do not generalize the GCOO prefix to arbitrary tokens",
     "scannedTextPreserved": true,
     "qrDestinationsFetched": false,

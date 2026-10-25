@@ -5,14 +5,21 @@ import type { AdminProfile } from '../../types/admin.js';
 export const adminReportQuery = z.strictObject({
   page: z.coerce.number().int().min(1).max(10000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  status: z.enum(['RECEIVED', 'PROCESSING', 'COMPLETED']).optional(),
+  status: z.enum(['RECEIVED', 'PROCESSING', 'COMPLETED', 'REJECTED']).optional(),
   q: z.string().trim().max(100).refine(value => !value.includes('\0')).default(''),
 });
 export const adminReportMapQuery = adminReportQuery.extend({
   pageSize: z.coerce.number().int().min(1).max(500).default(200),
 });
+const coordinate = z.union([z.number(), z.string().trim().min(1).transform(Number)]).pipe(z.number().finite());
+export const adminNearbyReportQuery = z.strictObject({
+  latitude: coordinate.pipe(z.number().min(-90).max(90)),
+  longitude: coordinate.pipe(z.number().min(-180).max(180)),
+  page: z.coerce.number().int().min(1).max(10000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(500).default(200),
+});
 export const adminReportTransition = z.strictObject({
-  status: z.enum(['PROCESSING', 'COMPLETED']),
+  status: z.enum(['PROCESSING', 'COMPLETED', 'REJECTED']),
   completionMethod: z.enum(['COLLECTED', 'TOWED']).optional(),
   publicNote: z.string().trim().max(1000).refine(value => !value.includes('\0')).optional(),
   internalNote: z.string().trim().max(1000).refine(value => !value.includes('\0')).optional(),
@@ -34,9 +41,10 @@ export const adminRelatedReportTransition = z.strictObject({
 });
 export type AdminReportQuery = z.infer<typeof adminReportQuery>;
 export type AdminReportMapQuery = z.infer<typeof adminReportMapQuery>;
+export type AdminNearbyReportQuery = z.infer<typeof adminNearbyReportQuery>;
 export type AdminReportTransition = z.infer<typeof adminReportTransition>;
 export type AdminRelatedReportTransition = z.infer<typeof adminRelatedReportTransition>;
-export type ReportStatus = 'RECEIVED' | 'PROCESSING' | 'COMPLETED';
+export type ReportStatus = 'RECEIVED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
 export type CompletionMethod = 'COLLECTED' | 'TOWED';
 export interface AdminReportSummary {
   publicId: string; createdAt: string; updatedAt: string; status: ReportStatus;
@@ -51,9 +59,10 @@ export interface AdminReportDetail extends AdminReportSummary {
     publicNote: string | null; internalNote: string | null; adminName: string | null }[];
 }
 export interface AdminReportMapItem extends AdminReportSummary { latitude: number; longitude: number }
+export interface AdminNearbyReportItem extends AdminReportMapItem { distanceMeters: number }
 export interface AdminRelatedReports {
   anchorPublicId: string; eligible: boolean;
-  reason: 'ANCHOR_COMPLETED' | 'IDENTITY_UNKNOWN' | 'CANDIDATE_LIMIT' | null;
+  reason: 'ANCHOR_COMPLETED' | 'ANCHOR_REJECTED' | 'IDENTITY_UNKNOWN' | 'CANDIDATE_LIMIT' | null;
   criteria: { distanceMeters: 100; timeWindowHours: 24; maxSelection: 100 };
   items: (AdminReportSummary & { distanceMeters: number })[];
   truncated: boolean;

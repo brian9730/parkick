@@ -12,7 +12,6 @@ async function openPhotos(page: Page) {
   await page.getByLabel('운영업체', { exact: true }).selectOption('other');
   await page.getByLabel('기타 업체명', { exact: true }).fill('사진 최적화 테스트');
   await page.getByLabel('기기번호', { exact: true }).fill('PHOTO-TEST');
-  await page.getByLabel('업체 및 기기 정보를 확인했습니다.').check();
   await next(page);
 }
 

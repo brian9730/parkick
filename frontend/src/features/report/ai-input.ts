@@ -5,8 +5,8 @@ import { normalizeOperatorName } from './operators';
 
 export function buildAiReportInput(draft: ReportDraft, location: ReportLocation | null): AiReportInput {
   return {
-    operator: draft.operatorMode === 'unknown' ? null : normalizeOperatorName(draft.operator) || null,
-    deviceId: draft.deviceUnknown ? null : draft.deviceId.trim() || null,
+    operator: normalizeOperatorName(draft.operator) || null,
+    deviceId: draft.deviceId.trim() || null,
     address: location?.address.trim() || null,
     categories: [...draft.categories],
     additionalDescription: draft.categories.includes('기타') ? draft.additionalDescription.trim() : '',

@@ -1,4 +1,4 @@
-import { CheckCheck, RefreshCw, Truck, X } from 'lucide-react';
+import { CheckCheck, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../../api/admin';
@@ -38,18 +38,18 @@ export function RelatedReportsPanel({ report, disabled, onCompleted, onReload, o
   const refreshCandidates = () => {
     if (pending.current || disabled) return;
     setSelected([]); setConfirmation(null); setError('');
-    if (conflict || data?.reason === 'ANCHOR_COMPLETED') { onReload(); return; }
+    if (conflict || data?.reason === 'ANCHOR_COMPLETED' || data?.reason === 'ANCHOR_REJECTED') { onReload(); return; }
     reload();
   };
   const candidates = data?.items ?? [];
   const selectedCandidates = candidates.filter(candidate => selected.includes(candidate.publicId));
   const selectionLimit = data?.criteria.maxSelection ?? 100;
   const unavailable = disabled || saving || conflict || loading || !!loadError || !data?.eligible;
-  const prepare = (completionMethod: AdminCompletionMethod) => {
+  const prepare = () => {
     if (unavailable || !selectedCandidates.length || selectedCandidates.length + 1 > selectionLimit) return;
     setError('');
     setConfirmation({
-      status: 'COMPLETED', completionMethod,
+      status: 'COMPLETED', completionMethod: 'COLLECTED',
       reports: [{ publicId: report.publicId, expectedUpdatedAt: report.updatedAt }, ...selectedCandidates.map(candidate => ({ publicId: candidate.publicId, expectedUpdatedAt: candidate.updatedAt }))],
       publicNote: publicNote.trim(), internalNote: internalNote.trim(),
     });
@@ -87,6 +87,7 @@ export function RelatedReportsPanel({ report, disabled, onCompleted, onReload, o
         : data && !data.eligible ? <p className="field-hint">{data.reason === 'IDENTITY_UNKNOWN'
           ? '확인된 업체와 기기번호가 모두 있어야 함께 처리할 신고를 찾을 수 있습니다. 현재 신고는 개별 처리해 주세요.'
           : data.reason === 'ANCHOR_COMPLETED' ? '현재 신고가 이미 완료되었습니다. 최신 상태를 불러와 주세요.'
+            : data.reason === 'ANCHOR_REJECTED' ? '현재 신고가 반려되었습니다. 최신 상태를 불러와 주세요.'
             : '후보가 많아 함께 처리할 대상을 안전하게 확인할 수 없습니다. 신고를 개별 확인해 주세요.'}</p>
           : data && candidates.length === 0 ? <p className="field-hint">현재 함께 처리할 수 있는 신고가 없습니다.</p>
             : data && <>
@@ -101,7 +102,7 @@ export function RelatedReportsPanel({ report, disabled, onCompleted, onReload, o
               <p className="field-hint">선택한 신고만 같은 조치 결과로 완료합니다. 각 접수번호와 신고 내역은 그대로 유지되며, 최대 {selectionLimit}건을 함께 처리할 수 있습니다.</p>
               <FormField label="함께 처리할 공개 메모" htmlFor="related-public-note" hint="선택한 각 신고의 시민 조회에 표시됩니다. 선택 입력, 최대 1,000자."><textarea id="related-public-note" rows={2} maxLength={1000} disabled={unavailable} value={publicNote} onChange={event => setPublicNote(event.target.value)} aria-describedby="related-public-note-hint" /></FormField>
               <FormField label="함께 처리할 내부 메모" htmlFor="related-internal-note" hint="선택한 각 신고의 관리자 처리 이력에만 표시됩니다. 선택 입력, 최대 1,000자."><textarea id="related-internal-note" rows={2} maxLength={1000} disabled={unavailable} value={internalNote} onChange={event => setInternalNote(event.target.value)} aria-describedby="related-internal-note-hint" /></FormField>
-              <div className="admin-status-actions"><Button disabled={unavailable || !selectedCandidates.length} onClick={() => prepare('COLLECTED')}><CheckCheck size={17} />선택 신고 함께 수거 완료</Button><Button variant="secondary" disabled={unavailable || !selectedCandidates.length} onClick={() => prepare('TOWED')}><Truck size={17} />선택 신고 함께 견인 완료</Button></div>
+              <div className="admin-status-actions"><Button disabled={unavailable || !selectedCandidates.length} onClick={prepare}><CheckCheck size={17} />선택 신고 함께 수거 완료</Button></div>
             </>}
     {error && <div className="admin-action-error" role="alert"><p>{error}</p></div>}
     <dialog ref={dialog} className="admin-confirm-dialog admin-related-confirm" aria-labelledby="related-confirm-heading" aria-describedby="related-confirm-description" onCancel={event => { event.preventDefault(); if (!saving) setConfirmation(null); }}>

@@ -16,9 +16,9 @@ export function ReportsPage() {
 
   return <>
     <div className="admin-page-heading"><div><p className="overline">REPORT MANAGEMENT</p><h1>신고 목록</h1><p>신고 내용을 확인하고 처리 상태를 관리하세요.</p></div><Button variant="secondary" onClick={reload} disabled={loading}><RefreshCw size={16} />새로고침</Button></div>
-    {skeleton && <PhaseNotice compact>개발 계정의 목록 미리보기입니다. 실제 신고 데이터가 연결되지 않았습니다.</PhaseNotice>}
+    {skeleton && <PhaseNotice compact>실제 신고 데이터가 연결되지 않았습니다.</PhaseNotice>}
     <form className="report-filters admin-report-filters" onSubmit={event => { event.preventDefault(); setFilters(value => ({ ...value, page: 1, q: search.trim() })); }}>
-      <div className="filter-field"><label htmlFor="status-filter">처리 상태</label><select id="status-filter" disabled={skeleton} value={filters.status} onChange={event => setFilters(value => ({ ...value, page: 1, status: event.target.value as AdminReportStatus | '' }))}><option value="">전체 상태</option><option value="RECEIVED">접수</option><option value="PROCESSING">처리중</option><option value="COMPLETED">처리완료</option></select></div>
+      <div className="filter-field"><label htmlFor="status-filter">처리 상태</label><select id="status-filter" disabled={skeleton} value={filters.status} onChange={event => setFilters(value => ({ ...value, page: 1, status: event.target.value as AdminReportStatus | '' }))}><option value="">전체 상태</option><option value="RECEIVED">접수</option><option value="REJECTED">반려</option><option value="COMPLETED">처리완료</option><option value="PROCESSING">처리중 (기존)</option></select></div>
       <div className="filter-field search-filter"><label htmlFor="search-report">신고 검색</label><div className="input-with-icon"><Search size={17} /><input id="search-report" disabled={skeleton} maxLength={100} value={search} onChange={event => setSearch(event.target.value)} placeholder="신고번호, 업체, 기기번호, 주소" /></div></div>
       <Button type="submit" disabled={skeleton || loading}>검색</Button>
       {(filters.q || filters.status) && <Button variant="secondary" onClick={() => { setSearch(''); setFilters({ page: 1, pageSize: 20, status: '', q: '' }); }}>초기화</Button>}

@@ -21,6 +21,7 @@ export function adminRoutes(auth: AdminAuthController, overview: AdminOverviewCo
   router.get('/dashboard', overview.dashboard);
   router.get('/reports', overview.reports);
   router.get('/reports/map', overview.map);
+  router.get('/reports/nearby', overview.nearby);
   router.get('/reports/:publicId/related', overview.related);
   router.patch('/reports/:publicId/related/status', overview.transitionRelated);
   router.get('/reports/:publicId', overview.detail);

@@ -5,6 +5,7 @@ import { ApiError } from '../../middleware/errors.js';
 import type { EvidenceUpload, PreparedEvidence } from './EvidenceStorage.js';
 
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+export const MAX_PHOTOS = 2;
 const MAX_PIXELS = 40_000_000;
 
 function badPhoto(): ApiError { return new ApiError(400, 'INVALID_PHOTO', '사진 형식이나 내용을 확인해주세요. JPG·PNG·WebP 정지 사진만 첨부할 수 있습니다.'); }
@@ -31,7 +32,7 @@ function animated(buffer: Buffer, format: 'jpeg' | 'png' | 'webp'): boolean {
 
 /** Both local and S3 persistence receive the same decoded, metadata-free JPEG evidence. */
 export async function prepareEvidence(files: readonly EvidenceUpload[]): Promise<PreparedEvidence[]> {
-  if (files.length < 1 || files.length > 3) throw new ApiError(400, 'INVALID_PHOTOS', '현장 사진을 1~3장 첨부해주세요.');
+  if (files.length < 1 || files.length > MAX_PHOTOS) throw new ApiError(400, 'INVALID_PHOTOS', '현장 사진을 1~2장 첨부해주세요.');
   const prepared: PreparedEvidence[] = [];
   for (const file of files) {
     if (!file.buffer.length) throw badPhoto();

@@ -1,7 +1,7 @@
 import type { AdminMapReport, AdminReportStatus } from '../../api/admin';
 import { adminCompletionLabel, formatAdminDate } from './report-display';
 
-export const mapStatusLabels: Record<AdminReportStatus, string> = { RECEIVED: '접수', PROCESSING: '처리중', COMPLETED: '처리완료' };
+export const mapStatusLabels: Record<AdminReportStatus, string> = { RECEIVED: '접수', PROCESSING: '처리중', COMPLETED: '처리완료', REJECTED: '반려' };
 
 function element<Tag extends keyof HTMLElementTagNameMap>(tag: Tag, className: string, text?: string): HTMLElementTagNameMap[Tag] {
   const node = document.createElement(tag);

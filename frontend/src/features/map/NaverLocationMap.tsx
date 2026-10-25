@@ -2,18 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import type { NaverMap, NaverMaps, NaverMapEventListener, NaverMarker } from './naver';
 import { isValidCoordinates } from './location';
 
-export function NaverLocationMap({ maps, latitude, longitude, onMove }: {
+export function NaverLocationMap({ maps, latitude, longitude, onMove, onError }: {
   maps: NaverMaps;
   latitude: number;
   longitude: number;
   onMove: (latitude: number, longitude: number) => void;
+  onError?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<NaverMap | null>(null);
   const markerRef = useRef<NaverMarker | null>(null);
-  const currentRef = useRef({ latitude, longitude, onMove });
+  const currentRef = useRef({ latitude, longitude, onMove, onError });
   const [failed, setFailed] = useState(false);
-  useEffect(() => { currentRef.current = { latitude, longitude, onMove }; }, [latitude, longitude, onMove]);
+  useEffect(() => { currentRef.current = { latitude, longitude, onMove, onError }; }, [latitude, longitude, onMove, onError]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -54,7 +55,7 @@ export function NaverLocationMap({ maps, latitude, longitude, onMove }: {
         dispose = undefined;
         markerRef.current = null;
         mapRef.current = null;
-        if (active) setFailed(true);
+        if (active) { setFailed(true); currentRef.current.onError?.(); }
       }
     });
     return () => {

@@ -13,6 +13,7 @@ enum ReportStatus {
   RECEIVED
   PROCESSING
   COMPLETED
+  REJECTED
 }
 
 enum ReportCompletionMethod {

@@ -126,6 +126,57 @@ describe('PostgreSQL administrator report management and tenant isolation', () =
   before(async () => { await client.$connect(); passwordHash = await hashPassword(password); });
   after(async () => { await client.$disconnect(); });
 
+  it('orders only active tenant reports by actual distance and pages without exposing private fields', async t => {
+    const f = await fixture(t);
+    const latitude = 37.123456; const longitude = 127.123456;
+    const extra = [0.0003, 0.001, 0.0001].map((delta, index) => ({
+      id: randomUUID(), publicId: `PK-20261016-${randomBytes(6).toString('hex')}`,
+      submissionId: randomUUID(), submissionHash: randomBytes(32).toString('hex'),
+      tenantId: f.tenantIds[0]!, regionId: f.regionIds[0]!,
+      latitude: latitude + delta, longitude, operatorName: f.marker,
+      deviceId: `NEARBY-${index}`, address: `Nearby fixture ${index}`, finalReportText: 'Nearby fixture',
+    }));
+    f.reportIds.push(...extra.map(row => row.id)); f.publicIds.push(...extra.map(row => row.publicId));
+    await client.report.createMany({ data: extra });
+    const completedSnapshot = (await f.get(`/reports/${extra[2]!.publicId}`, 1).expect(200)).body.data;
+    await f.patch(extra[2]!.publicId, { status: 'COMPLETED', completionMethod: 'COLLECTED',
+      expectedUpdatedAt: completedSnapshot.updatedAt }, 1).expect(200);
+    const originalSnapshot = (await f.get(`/reports/${f.publicIds[0]}`, 1).expect(200)).body.data;
+    await f.patch(f.publicIds[0]!, { status: 'PROCESSING', expectedUpdatedAt: originalSnapshot.updatedAt }, 1).expect(200);
+
+    const path = `/reports/nearby?latitude=${latitude}&longitude=${longitude}`;
+    const response = await f.get(path, 1).expect(200);
+    assert.equal(response.headers['cache-control'], 'no-store');
+    const page = response.body.data;
+    assert.equal(page.mode, 'database'); assert.equal(page.total, 3);
+    assert.deepEqual(page.items.map((row: { publicId: string }) => row.publicId),
+      [f.publicIds[0], extra[0]!.publicId, extra[1]!.publicId]);
+    assert.deepEqual(page.items.map((row: { status: string }) => row.status), ['PROCESSING', 'RECEIVED', 'RECEIVED']);
+    assert.equal(page.items[0].distanceMeters, 0);
+    assert.ok(page.items[1].distanceMeters >= 33 && page.items[1].distanceMeters <= 34);
+    assert.ok(page.items[2].distanceMeters >= 111 && page.items[2].distanceMeters <= 112);
+    const allowed = ['publicId', 'createdAt', 'updatedAt', 'status', 'completionMethod', 'completedAt', 'operatorName',
+      'deviceId', 'address', 'categories', 'tenant', 'region', 'latitude', 'longitude', 'distanceMeters'].sort();
+    assert.deepEqual(Object.keys(page.items[0]).sort(), allowed);
+    for (const secret of [phone, 'contactPhoneMasked', 'contactPhoneCipher', 'qrRawData', 'finalReportText', 'images', 'internalNote']) {
+      assert.equal(JSON.stringify(page).includes(secret), false);
+    }
+    for (let index = 0; index < 3; index += 1) {
+      const paged = (await f.get(`${path}&pageSize=1&page=${index + 1}`, 1).expect(200)).body.data;
+      assert.equal(paged.total, 3); assert.equal(paged.items.length, 1);
+      assert.equal(paged.items[0].publicId, page.items[index].publicId);
+    }
+    assert.equal((await f.get(`${path}&pageSize=1&page=4`, 1).expect(200)).body.data.items.length, 0);
+    const otherTenant = (await f.get(path, 2).expect(200)).body.data;
+    assert.equal(otherTenant.total, 1); assert.equal(otherTenant.items[0].publicId, f.publicIds[1]);
+    await request(f.app).get(`/api/admin${path}`).expect(401);
+    for (const invalid of ['/reports/nearby', '/reports/nearby?latitude=37',
+      '/reports/nearby?latitude=91&longitude=127', '/reports/nearby?latitude=&longitude=127',
+      `${path}&tenantId=${f.tenantIds[1]}`, `${path}&pageSize=501`, `${path}&latitude=37`]) {
+      assert.equal((await f.get(invalid, 1).expect(400)).body.error.code, 'INVALID_INPUT');
+    }
+  });
+
   it('returns authorized map coordinates with scoped counts and filters, without contact, evidence or internal details', async t => {
     const f = await fixture(t);
     await client.report.update({ where: { id: f.reportIds[1] }, data: { latitude: 35.179554, longitude: 129.075642 } });
@@ -199,7 +250,7 @@ describe('PostgreSQL administrator report management and tenant isolation', () =
       const list = (await f.get('/reports', actor).expect(200)).body.data;
       assert.equal(list.total, 1); assert.equal(list.items[0].publicId, f.publicIds[actor - 1]);
       const dashboard = (await f.get('/dashboard', actor).expect(200)).body.data;
-      assert.deepEqual(dashboard.summary, { total: 1, today: 1, received: 1, processing: 0, completed: 0 });
+      assert.deepEqual(dashboard.summary, { total: 1, today: 1, received: 1, processing: 0, completed: 0, rejected: 0 });
       assert.deepEqual(dashboard.recentReports.map((row: { publicId: string }) => row.publicId), [f.publicIds[actor - 1]]);
       assert.equal((await f.get('/reports?status=COMPLETED', actor).expect(200)).body.data.total, 0);
     }
@@ -261,7 +312,53 @@ describe('PostgreSQL administrator report management and tenant isolation', () =
     for (const secret of ['PRIVATE_', 'internalNote', f.adminIds[1]!]) assert.equal(JSON.stringify(lookup.body).includes(secret), false);
     for (const body of [{ ...completedBody, completionMethod: 'COLLECTED' }, { status: 'PROCESSING', expectedUpdatedAt: completed.updatedAt }, { ...completedBody, publicNote: '수정 요청' }]) await f.patch(f.publicIds[0]!, body, 1).expect(409);
     assert.equal(await client.reportStatusHistory.count({ where: { reportId: f.reportIds[0] } }), 3);
-    assert.deepEqual((await f.get('/dashboard', 1).expect(200)).body.data.summary, { total: 1, today: 1, received: 0, processing: 0, completed: 1 });
+    assert.deepEqual((await f.get('/dashboard', 1).expect(200)).body.data.summary, { total: 1, today: 1, received: 0, processing: 0, completed: 1, rejected: 0 });
+  });
+
+  it('records a terminal rejection, counts it separately, and exposes only its public note to the reporter', async t => {
+    const f = await fixture(t);
+    const publicId = f.publicIds[0]!;
+    const initial = (await f.get(`/reports/${publicId}`, 1).expect(200)).body.data;
+    const body = { status: 'REJECTED', expectedUpdatedAt: initial.updatedAt,
+      publicNote: '공유 킥보드 또는 자전거 신고 대상이 아닙니다.', internalNote: 'PRIVATE_REJECTION_REASON' };
+    await f.patch(publicId, body, 2).expect(404);
+    const rejected = (await f.patch(publicId, body, 1).expect(200)).body.data;
+    assert.equal(rejected.status, 'REJECTED');
+    assert.equal(rejected.completionMethod, null);
+    assert.equal(rejected.completedAt, null);
+    assert.equal(rejected.history.length, 2);
+    assert.equal(rejected.history[1].status, 'REJECTED');
+    assert.equal(rejected.history[1].internalNote, body.internalNote);
+    assert.deepEqual((await f.patch(publicId, body, 1).expect(200)).body.data, rejected);
+    assert.deepEqual((await f.get('/dashboard', 1).expect(200)).body.data.summary,
+      { total: 1, today: 1, received: 0, processing: 0, completed: 0, rejected: 1 });
+    assert.equal((await f.get('/reports?status=REJECTED', 1).expect(200)).body.data.items[0].publicId, publicId);
+    assert.equal((await f.get('/reports/map?status=REJECTED', 1).expect(200)).body.data.items[0].publicId, publicId);
+    assert.equal((await f.get('/reports/nearby?latitude=37.123456&longitude=127.123456', 1).expect(200)).body.data.total, 0);
+    assert.equal((await f.get(`/reports/${publicId}/related`, 1).expect(200)).body.data.reason, 'ANCHOR_REJECTED');
+    const lookup = (await request(f.app).post(`/api/reports/lookup/${publicId}`).set('Origin', origin).send({ phone }).expect(200)).body.data;
+    assert.equal(lookup.status, 'REJECTED');
+    assert.equal(lookup.history.at(-1).publicNote, body.publicNote);
+    for (const secret of ['PRIVATE_', 'internalNote', f.adminIds[1]!]) assert.equal(JSON.stringify(lookup).includes(secret), false);
+    for (const next of [{ status: 'PROCESSING', expectedUpdatedAt: rejected.updatedAt },
+      { status: 'COMPLETED', completionMethod: 'COLLECTED', expectedUpdatedAt: rejected.updatedAt },
+      { status: 'REJECTED', expectedUpdatedAt: rejected.updatedAt, publicNote: 'different' }]) {
+      await f.patch(publicId, next, 1).expect(409);
+    }
+    assert.equal(await client.reportStatusHistory.count({ where: { reportId: f.reportIds[0] } }), 2);
+  });
+
+  it('allows a legacy processing report to be rejected without completion metadata', async t => {
+    const f = await fixture(t);
+    const publicId = f.publicIds[0]!;
+    const initial = (await f.get(`/reports/${publicId}`, 1).expect(200)).body.data;
+    const processing = (await f.patch(publicId, { status: 'PROCESSING', expectedUpdatedAt: initial.updatedAt }, 1).expect(200)).body.data;
+    const rejected = (await f.patch(publicId, { status: 'REJECTED', expectedUpdatedAt: processing.updatedAt }, 1).expect(200)).body.data;
+    assert.deepEqual(rejected.history.map((event: { status: string }) => event.status), ['RECEIVED', 'PROCESSING', 'REJECTED']);
+    assert.equal(rejected.completionMethod, null);
+    assert.equal(rejected.completedAt, null);
+    const stored = await client.report.findUniqueOrThrow({ where: { id: f.reportIds[0] } });
+    assert.equal(stored.completedByAdminId, null);
   });
 
   it('supports direct collection completion and rejects invalid, oversized or forged transition input', async t => {
@@ -355,6 +452,19 @@ describe('PostgreSQL related-report discovery and explicit bulk completion', () 
     assert.deepEqual(newGroup.map((row: { publicId: string }) => row.publicId), [laterPeer.publicId]);
     await f.patchRelated(f.anchorPublicId, await f.body([f.anchorPublicId, later.publicId])).expect(409);
     assert.equal((await client.report.findUniqueOrThrow({ where: { id: later.id } })).status, 'RECEIVED');
+  });
+
+  it('excludes rejected reports from related collection and refuses a rejected bulk selection', async t => {
+    const f = await relatedFixture(t);
+    const candidate = await f.add();
+    const before = (await f.get(`/reports/${candidate.publicId}`, 1).expect(200)).body.data;
+    await f.patch(candidate.publicId, { status: 'REJECTED', expectedUpdatedAt: before.updatedAt }, 1).expect(200);
+    const related = (await f.get(`/reports/${f.anchorPublicId}/related`, 1).expect(200)).body.data;
+    assert.equal(related.eligible, true);
+    assert.deepEqual(related.items, []);
+    await f.patchRelated(f.anchorPublicId, await f.body([f.anchorPublicId, candidate.publicId]), 1).expect(409);
+    assert.equal((await f.get(`/reports/${f.anchorPublicId}`, 1).expect(200)).body.data.status, 'RECEIVED');
+    assert.equal((await f.get(`/reports/${candidate.publicId}`, 1).expect(200)).body.data.status, 'REJECTED');
   });
 
   it('rejects stale, cross-tenant and ineligible selections atomically and requires the anchor in valid input', async t => {

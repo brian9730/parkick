@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, ChevronRight, ClipboardList, LoaderCircle, Search, Smartphone } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Button, EmptyState, FormField, LoadingState, PhaseNotice, StatusBadge } from '../../components/ui';
+import { Button, EmptyState, FormField, LoadingState, StatusBadge } from '../../components/ui';
 import { useReportLookup } from '../../features/report/lookup-context';
 import { completionLabel, formatLookupDate } from '../../features/report/lookup-display';
 import { parseReportReceipt, readReportReceipt } from '../../features/report/receipt';
@@ -43,9 +43,8 @@ export function ReportCompletePage() {
   if (!receipt) return <div className="flow-page"><div className="status-container"><EmptyState title="접수된 신고 정보가 없어요" description="이 화면에서 확인할 접수 정보가 없습니다. 신고를 제출한 뒤 발급된 접수번호를 확인해 주세요."><Link to="/report" className="button button-primary">신고하러 가기</Link><Link to="/" className="text-link">홈으로 돌아가기</Link></EmptyState></div></div>;
   const receivedAt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul' }).format(new Date(receipt.createdAt));
   return <div className="flow-page"><div className="status-container">
-    <div className="status-heading"><span className="feature-icon"><CheckCircle2 size={32} strokeWidth={1.5} /></span><p className="overline">REPORT RECEIVED</p><h1>개발용 신고가 접수됐어요</h1><p>신고 내용과 사진을 저장했습니다.<br />아래 접수번호를 확인해 주세요.</p></div>
+    <div className="status-heading"><span className="feature-icon"><CheckCircle2 size={32} strokeWidth={1.5} /></span><p className="overline">REPORT RECEIVED</p><h1>신고가 접수됐어요</h1><p>신고 내용과 사진을 저장했습니다.<br />아래 접수번호를 확인해 주세요.</p></div>
     <div className="status-form-card receipt-card">
-      <PhaseNotice>개발용 접수입니다. 지자체에 전달되거나 실제 민원으로 처리되지 않아요.</PhaseNotice>
       <div className="report-summary"><h3>접수 정보</h3><dl>
         <div><dt>접수번호</dt><dd className="receipt-id">{receipt.publicId}</dd></div>
         <div><dt>접수 상태</dt><dd><StatusBadge status={receipt.status} /></dd></div>

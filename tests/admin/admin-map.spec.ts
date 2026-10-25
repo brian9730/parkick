@@ -327,7 +327,7 @@ test('status and search filters update real map results without address lookups'
   expect(await page.evaluate(() => window.__adminMapFixture.reverseGeocodeCalls)).toBe(0);
   await page.getByRole('button', { name: '신고 정보 닫기', exact: true }).click();
   await expect(page.locator('.admin-map-info')).toHaveCount(0);
-  await page.getByRole('navigation', { name: '관리자 메뉴' }).getByRole('link', { name: '신고 목록', exact: true }).click();
+  await page.getByRole('navigation', { name: '관리자 메뉴' }).getByRole('link', { name: '신고 관리', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/reports$/);
   expect(await page.evaluate(() => window.__adminMapFixture.markers.every(marker => !marker.attached))).toBe(true);
   expect(await page.evaluate(() => window.__adminMapFixture.destroyedMaps)).toBeGreaterThan(0);

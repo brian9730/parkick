@@ -1,4 +1,4 @@
-import { CheckCheck, Clock3, Truck, X } from 'lucide-react';
+import { Ban, CheckCheck, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { adminApi } from '../../api/admin';
 import type { AdminReportDetail, ReportStatusUpdate } from '../../api/admin';
@@ -7,12 +7,13 @@ import { Button, FormField } from '../../components/ui';
 import { useAuth } from './auth-context';
 import { adminCompletionLabel, formatAdminDate } from './report-display';
 
-type Action = 'PROCESSING' | 'COLLECTED' | 'TOWED';
-const actionLabel = (action: Action) => action === 'PROCESSING' ? '처리중으로 변경' : adminCompletionLabel(action);
+type Action = 'REJECTED' | 'COLLECTED';
+const actionLabel = (action: Action) => action === 'REJECTED' ? '반려' : adminCompletionLabel(action);
 interface Confirmation { action: Action; update: ReportStatusUpdate }
 
-export function ReportStatusForm({ report, onUpdated, onReload, onBusyChange }: {
+export function ReportStatusForm({ report, collectionMode = false, onUpdated, onReload, onBusyChange }: {
   report: AdminReportDetail;
+  collectionMode?: boolean;
   onUpdated: (report: AdminReportDetail) => void;
   onReload: () => void;
   onBusyChange: (busy: boolean) => void;
@@ -25,6 +26,7 @@ export function ReportStatusForm({ report, onUpdated, onReload, onBusyChange }: 
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
+  const publicNoteInput = useRef<HTMLTextAreaElement>(null);
   const pending = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -35,9 +37,14 @@ export function ReportStatusForm({ report, onUpdated, onReload, onBusyChange }: 
 
   const prepare = (action: Action) => {
     setError('');
+    if (collectionMode && action === 'REJECTED' && !publicNote.trim()) {
+      setError('반려 사유를 공개 처리 메모에 입력해 주세요. 시민의 신고 조회 화면에도 표시됩니다.');
+      publicNoteInput.current?.focus();
+      return;
+    }
     setConfirmation({ action, update: {
-      status: action === 'PROCESSING' ? 'PROCESSING' : 'COMPLETED',
-      ...(action === 'PROCESSING' ? {} : { completionMethod: action }),
+      status: action === 'REJECTED' ? 'REJECTED' : 'COMPLETED',
+      ...(action === 'REJECTED' ? {} : { completionMethod: action }),
       publicNote: publicNote.trim(), internalNote: internalNote.trim(), expectedUpdatedAt: report.updatedAt,
     } });
   };
@@ -64,27 +71,33 @@ export function ReportStatusForm({ report, onUpdated, onReload, onBusyChange }: 
     }
   };
 
-  if (report.status === 'COMPLETED') return <section className="dashboard-panel admin-completed-panel" aria-labelledby="report-actions-heading">
-    <CheckCheck size={26} /><h2 id="report-actions-heading">{adminCompletionLabel(report.completionMethod) || '처리 완료'}</h2>
+  if (report.status === 'COMPLETED' || report.status === 'REJECTED') return <section className={`dashboard-panel admin-completed-panel ${report.status === 'REJECTED' ? 'admin-rejected-panel' : ''}`} aria-labelledby="report-actions-heading">
+    {report.status === 'REJECTED' ? <Ban size={26} /> : <CheckCheck size={26} />}
+    <h2 id="report-actions-heading">{report.status === 'REJECTED' ? '반려' : adminCompletionLabel(report.completionMethod) || '처리 완료'}</h2>
     {report.completedAt && <p><time dateTime={report.completedAt}>{formatAdminDate(report.completedAt)}</time>에 완료했습니다.</p>}
-    <p>완료된 신고는 상태를 다시 변경할 수 없습니다.</p>
+    <p>{report.status === 'REJECTED' ? '반려된 신고는 상태를 다시 변경할 수 없습니다.' : '완료된 신고는 상태를 다시 변경할 수 없습니다.'}</p>
   </section>;
 
-  return <section className="dashboard-panel admin-status-form" aria-labelledby="report-actions-heading">
-    <div className="panel-heading"><div><h2 id="report-actions-heading">처리 상태 변경</h2><p>현장 조치 결과를 선택해 저장하세요. 완료 후에는 상태를 다시 변경할 수 없습니다.</p></div></div>
-    <FormField label="공개 처리 메모" htmlFor="admin-public-note" hint="전화번호로 조회하는 시민에게 표시됩니다. 선택 입력, 최대 1,000자."><textarea id="admin-public-note" rows={3} maxLength={1000} disabled={saving || conflict} value={publicNote} onChange={event => setPublicNote(event.target.value)} aria-describedby="admin-public-note-hint" placeholder="예: 보행에 방해되지 않도록 수거했습니다." /></FormField>
+  const actions = <div className="admin-status-actions">
+    {(report.status === 'RECEIVED' || report.status === 'PROCESSING') && <Button variant="secondary" disabled={saving || conflict} onClick={() => prepare('REJECTED')}><Ban size={17} />반려</Button>}
+    <Button disabled={saving || conflict} onClick={() => prepare('COLLECTED')}><CheckCheck size={17} />수거 완료</Button>
+  </div>;
+  const feedback = error && <div className="admin-action-error" role="alert"><p>{error}</p>{conflict && <Button variant="secondary" onClick={onReload}>최신 상태 불러오기</Button>}</div>;
+
+  return <section className={`dashboard-panel admin-status-form${collectionMode ? ' collection-status-form' : ''}`} aria-labelledby="report-actions-heading">
+    <div className="panel-heading"><div><h2 id="report-actions-heading">{collectionMode ? '현장 처리' : '처리 상태 변경'}</h2><p>신고를 반려하거나 현장 수거 결과를 저장하세요. 저장 후에는 상태를 다시 변경할 수 없습니다.</p></div></div>
+    {collectionMode && actions}
+    {collectionMode && feedback}
+    {collectionMode && <div className="collection-rejection-reason"><span>현장에 기기가 없다면</span><button type="button" disabled={saving || conflict} onClick={() => { setPublicNote('현장에 기기가 없어 수거하지 못했습니다.'); setError(''); }}>반려 사유 빠르게 입력</button></div>}
+    <FormField label="공개 처리 메모" htmlFor="admin-public-note" hint={collectionMode ? '반려 시 사유를 입력해야 합니다. 시민의 신고 조회 화면에 표시됩니다.' : '전화번호로 조회하는 시민에게 표시됩니다. 선택 입력, 최대 1,000자.'}><textarea ref={publicNoteInput} id="admin-public-note" rows={3} maxLength={1000} disabled={saving || conflict} value={publicNote} onChange={event => { setPublicNote(event.target.value); if (error) setError(''); }} aria-describedby="admin-public-note-hint" placeholder={collectionMode ? '예: 현장에 기기가 없어 수거하지 못했습니다.' : '예: 보행에 방해되지 않도록 수거했습니다.'} /></FormField>
     <FormField label="내부 메모" htmlFor="admin-internal-note" hint="관리자만 확인합니다. 시민 조회에는 표시되지 않습니다. 선택 입력, 최대 1,000자."><textarea id="admin-internal-note" rows={3} maxLength={1000} disabled={saving || conflict} value={internalNote} onChange={event => setInternalNote(event.target.value)} aria-describedby="admin-internal-note-hint" /></FormField>
-    {error && <div className="admin-action-error" role="alert"><p>{error}</p>{conflict && <Button variant="secondary" onClick={onReload}>최신 상태 불러오기</Button>}</div>}
-    <div className="admin-status-actions">
-      {report.status === 'RECEIVED' && <Button variant="secondary" disabled={saving || conflict} onClick={() => prepare('PROCESSING')}><Clock3 size={17} />처리중으로 변경</Button>}
-      <Button disabled={saving || conflict} onClick={() => prepare('COLLECTED')}><CheckCheck size={17} />수거 완료</Button>
-      <Button variant="secondary" disabled={saving || conflict} onClick={() => prepare('TOWED')}><Truck size={17} />견인 완료</Button>
-    </div>
+    {!collectionMode && feedback}
+    {!collectionMode && actions}
     <dialog ref={dialog} className="admin-confirm-dialog" aria-labelledby="admin-confirm-title" aria-describedby="admin-confirm-description" onCancel={event => { event.preventDefault(); if (!saving) setConfirmation(null); }}>
       {confirmation && <>
         <div className="admin-confirm-heading"><h2 id="admin-confirm-title">처리 상태 변경 확인</h2><button className="icon-button" type="button" disabled={saving} onClick={() => setConfirmation(null)} aria-label="확인 창 닫기"><X size={20} /></button></div>
         <p className="admin-report-id">{report.publicId}</p>
-        <p id="admin-confirm-description"><strong>{actionLabel(confirmation.action)}</strong> 상태로 저장합니다.{confirmation.action !== 'PROCESSING' && ' 완료 후에는 수정할 수 없습니다.'}</p>
+        <p id="admin-confirm-description"><strong>{actionLabel(confirmation.action)}</strong> 상태로 저장합니다. 저장 후에는 상태를 다시 변경할 수 없습니다.{confirmation.action === 'REJECTED' && ' 공개 처리 메모를 입력했다면 시민의 신고 조회 화면에 표시됩니다.'}</p>
         <dl className="admin-confirm-notes"><div><dt>공개 처리 메모</dt><dd>{confirmation.update.publicNote || '없음'}</dd></div><div><dt>내부 메모</dt><dd>{confirmation.update.internalNote || '없음'}</dd></div></dl>
         <div className="admin-confirm-actions"><Button variant="secondary" disabled={saving} onClick={() => setConfirmation(null)}>취소</Button><Button disabled={saving} onClick={() => void save()}>{saving ? '저장 중…' : '변경 확인'}</Button></div>
       </>}

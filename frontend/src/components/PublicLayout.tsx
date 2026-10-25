@@ -14,5 +14,5 @@ export function ParkickHeader() {
 }
 
 export function PublicLayout() {
-  return <><a className="skip-link" href="#main-content">본문 바로가기</a><ParkickHeader /><main id="main-content"><Outlet /></main><footer className="public-footer"><div className="container footer-inner"><div><ParkickLogo compact /><p>함께 만드는 더 안전한 보행 환경</p></div><div className="footer-meta"><span>Parkick · 공유 PM 주차 신고 플랫폼</span><span>개발용 서비스 · 지자체 전달 전</span></div></div></footer></>;
+  return <><a className="skip-link" href="#main-content">본문 바로가기</a><ParkickHeader /><main id="main-content"><Outlet /></main><footer className="public-footer"><div className="container footer-inner"><div><ParkickLogo compact /><p>함께 만드는 더 안전한 보행 환경</p></div><div className="footer-meta"><span>Parkick · 공유 PM 주차 신고 플랫폼</span></div></div></footer></>;
 }

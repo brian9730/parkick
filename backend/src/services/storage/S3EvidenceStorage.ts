@@ -3,7 +3,7 @@ import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand, S3Client } fr
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ApiError } from '../../middleware/errors.js';
 import type { EvidenceStorage, PreparedEvidence, SavedEvidence, StoredEvidence } from './EvidenceStorage.js';
-import { prepareEvidence } from './prepareEvidence.js';
+import { MAX_PHOTOS, prepareEvidence } from './prepareEvidence.js';
 
 export interface S3EvidenceStorageOptions {
   region: string;
@@ -13,6 +13,8 @@ export interface S3EvidenceStorageOptions {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+// Older reports may have three stored photos even though new uploads allow two.
+const MAX_STORED_PHOTOS = 3;
 
 function unavailable(): ApiError {
   return new ApiError(503, 'STORAGE_UNAVAILABLE', '사진을 보관하지 못했습니다. 잠시 후 다시 시도해주세요.');
@@ -38,7 +40,7 @@ export class S3EvidenceStorage implements EvidenceStorage {
   }
 
   async save(prepared: readonly PreparedEvidence[]): Promise<SavedEvidence> {
-    if (prepared.length < 1 || prepared.length > 3) throw new ApiError(400, 'INVALID_PHOTOS', '현장 사진을 1~3장 첨부해주세요.');
+    if (prepared.length < 1 || prepared.length > MAX_PHOTOS) throw new ApiError(400, 'INVALID_PHOTOS', '현장 사진을 1~2장 첨부해주세요.');
     const directory = randomUUID();
     const keys = this.attemptKeys(directory);
     const images: StoredEvidence[] = [];
@@ -102,6 +104,6 @@ export class S3EvidenceStorage implements EvidenceStorage {
 
   private attemptKeys(directory: string): string[] {
     if (!UUID.test(directory)) throw new Error('Invalid evidence directory');
-    return [1, 2, 3].map(index => `${this.prefix}/${directory}/${index}.jpg`);
+    return Array.from({ length: MAX_STORED_PHOTOS }, (_, index) => `${this.prefix}/${directory}/${index + 1}.jpg`);
   }
 }

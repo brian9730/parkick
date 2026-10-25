@@ -1,0 +1,52 @@
+/* Keep all report reasons visible at once on a phone-sized screen. */
+@media (max-width: 680px) {
+  .category-step {
+    margin-top: 13px;
+  }
+
+  .category-step > .field-hint {
+    display: block;
+    line-height: 1.35;
+  }
+
+  .category-step .category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin: 7px 0 0;
+  }
+
+  .category-step .category-option {
+    min-width: 0;
+    min-height: 44px;
+    padding: 6px 7px;
+    font-size: 11px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .category-step .category-checkbox {
+    width: 15px;
+    height: 15px;
+  }
+
+  .category-step .form-field {
+    gap: 4px;
+    margin: 9px 0 0;
+  }
+
+  .category-step textarea {
+    height: 51px;
+    min-height: 51px;
+    padding: 7px 9px;
+    line-height: 1.3;
+    resize: vertical;
+  }
+
+  .category-step .character-count {
+    font-size: 9px;
+  }
+
+  .category-step ~ .wizard-actions {
+    margin-top: 15px;
+  }
+}

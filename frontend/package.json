@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "lint": "eslint . --max-warnings 0",
-    "test": "tsx --test src/features/photos/validation.test.ts src/features/admin/map-clusters.test.ts",
+    "test": "tsx --test src/features/photos/validation.test.ts src/features/admin/map-clusters.test.ts src/features/admin/report-display.test.ts src/features/admin/naver-route.test.ts",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

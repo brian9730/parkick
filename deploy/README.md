@@ -1,8 +1,34 @@
-# EC2 한 대에 웹·API·PostgreSQL·비공개 사진 배포
+# EC2 웹·API·PostgreSQL과 비공개 S3 사진 배포
 
-초기에는 Ubuntu EC2 한 대에서 Nginx, Node.js 22, PostgreSQL을 실행하고 사진도 같은 서버의 비공개 폴더 `/var/lib/parkick/reports`에 저장합니다. Nginx가 HTTPS와 React 정적 파일을 제공하고 `/api/`를 `127.0.0.1:4000`으로 전달합니다. 사진 폴더는 정적 웹 경로에 포함하지 않습니다. S3 전환은 후속 선택 사항이며 현재 배포에 S3 접근용 IAM 역할은 필요하지 않습니다.
+2026-10-23 현재 `SafeInstanceProfile-sgu-202686`을 운영 EC2에 연결했고, EC2의 `parkick` 서비스 계정에서 S3 임시 객체 쓰기·읽기·삭제를 확인했습니다. 운영 API는 `REPORT_STORAGE_PROVIDER=s3`, 사진 판별은 `AI_PROVIDER=litellm`입니다. 기존 신고 사진 6장(총 12,195,775바이트)은 S3로 이전하고 DB 경로를 변경했으며, 이전 후 6장 모두 S3 조회 검증을 통과했습니다. EC2 로컬 원본은 복구를 위해 보존합니다. 내부 LiteLLM 프록시의 HTTPS 접속·모델 목록과 실제 Parkick 사진 사전 검사에서 관련 사진 허용·무관 사진 거부를 확인했습니다. [역할 및 AI 연동 안내](iam-admin-setup.md)를 참조하세요.
 
-**2026-10-15 현재 초기 EC2 웹·API·PostgreSQL·비공개 사진 폴더·IP HTTPS 배포를 완료했습니다.** 주소는 **[https://15.165.235.154](https://15.165.235.154)**입니다. 외부 HTTPS·API 접수·중복 재시도 검사 6개, 모바일 Chrome 초기 신고 흐름 검사 5개와 인증서 갱신 dry-run·Nginx 재적용 hook 검사를 통과했습니다. 아래에는 실제 적용한 구성과 같은 방식으로 준비하는 절차를 정리합니다.
+Ubuntu EC2 한 대에서 Nginx, Node.js 22, PostgreSQL을 실행하고 신고 사진은 서울 리전의 비공개 S3 버킷에 저장합니다. Nginx가 HTTPS와 React 정적 파일을 제공하고 `/api/`를 `127.0.0.1:4000`으로 전달합니다. EC2의 `/var/lib/parkick/reports`에는 이전한 사진의 복구용 원본을 보존하며 정적 웹 경로에 포함하지 않습니다. S3 접근에는 연결된 EC2 인스턴스 프로필의 임시 자격증명을 사용합니다.
+
+**운영 EC2는 현재 `20261025-collection-field-1` 릴리스입니다.** 주소는 **[https://15.165.235.154](https://15.165.235.154)**입니다. `/api/health`는 사진 판별 `litellm`과 사진 저장 `private-s3`를, `/api/reports/status`는 접수 `available=true`·저장 `s3`를 반환합니다. `/api/health.services.ai`의 `disabled`는 사용하지 않는 이전 텍스트 신고문 생성기를 가리키며 현장 사진 판별 상태는 `photoValidation`에서 확인합니다. 외부 HTTPS `POST /api/reports/validate-photos`에서 공개 공유 킥보드 사진은 200·`valid=true`, 생성한 무관한 빨간 JPEG는 422·`PHOTO_NOT_PM`이었습니다. 시험 신고는 생성하지 않았습니다. S3 역할의 임시 객체 작업과 기존 사진 6장의 이전·조회는 이전 릴리스에서 확인했습니다. 운영 관리자·시민 브라우저의 이전 사진 표시와 신규 신고 전체 흐름은 아직 별도 검증이 필요합니다.
+
+2026-10-25 관리자 대시보드에 **관리 모드 / 수거 모드** 전환을 추가하고 EC2에 배포했습니다. 수거 모드는 기기 GPS로 현재 위치를 확인해 네이버 지도와 미완료 신고 목록을 표시합니다. 목록은 현재 위치에서 직선거리 가까운 순으로 정렬하며 업체·기기번호·위치·신고유형·거리를 보여줍니다. EC2에서 프런트엔드·백엔드 lint와 빌드가 통과했고, 운영 PostgreSQL 읽기 전용 조회에서 미완료 신고 8건의 거리순 정렬을 확인했습니다. 비로그인 API는 401이었고 실제 HTTPS 화면에서는 관리자 API만 대역한 브라우저 테스트 2개와 네이버 지도 타일·신고 마커·현재 위치 마커 표시가 통과했습니다. 테스트 신고나 DB 변경은 없었습니다.
+
+같은 날 `20261025-admin-sidebar-1`에서는 데스크톱 관리자 메뉴를 이전의 고정 사이드 메뉴로 복원했습니다. 관리·수거 모드와 계정 메뉴는 유지하고 1050px 이하에서는 기존 햄버거 메뉴를 사용합니다. 프런트엔드 lint·빌드와 실제 HTTPS 브라우저에서 데스크톱 사이드 메뉴, 수거 모드, 모바일 메뉴, 가로 넘침 없음이 확인됐습니다. 백엔드와 DB 스키마는 변경하지 않았습니다.
+
+`20261025-admin-list-focus-1`에서는 수거 대상 목록 항목을 누르면 네이버 지도가 해당 신고 좌표로 이동·확대하고 신고 정보창을 엽니다. 상세 페이지 링크는 항목에 별도로 두었습니다. 로컬 모의 지도 테스트에서 좌표 이동·확대·정보창·반복 선택을 확인했고, EC2 프런트엔드 lint·빌드 및 실제 HTTPS 브라우저에서 네이버 지도 타일 24개와 두 번째 신고 선택·정보창·상세 링크, 모바일에서 항목 선택 후 지도가 화면에 보이는 동작을 확인했습니다. 브라우저 API 응답만 대역했으며 운영 DB에 신고를 생성하지 않았습니다.
+
+`20261025-admin-top-nav-1`에서는 PC 관리자 메뉴를 상단 헤더로 되돌렸습니다. 1050px 이하의 기존 햄버거 메뉴와 수거 모드·신고 위치 정보창은 유지합니다. Frontend lint·빌드와 실제 HTTPS 브라우저에서 1440px·1051px 상단 메뉴, 1050px·390px 모바일 메뉴, 가로 넘침 없음과 관리·수거 모드 전환을 확인했습니다. 새 릴리스는 소스를 별도로 복제하고 변하지 않은 의존성 파일만 하드 링크로 공유해 이전 릴리스를 보존했습니다. 이 릴리스에서는 npm install/ci를 실행하지 않습니다.
+
+`20261025-admin-rejected-1`에서는 관리자 관리 모드의 상단 집계를 `오늘 접수 / 접수 / 반려 / 처리 완료`로 바꾸고, 신고 상세에서 실제 `반려` 상태를 저장할 수 있게 했습니다. 기존 `처리중` 신고는 조회와 반려가 가능하지만 새 화면에서 처리중으로 변경하는 버튼은 표시하지 않습니다. 반려는 이력에 남고 시민 조회에 공개 처리 메모만 표시되며 수거 목록·같은 기기 함께 처리에서는 제외됩니다. DB에는 기존 상태를 변경하지 않고 `REJECTED` enum 값만 추가했습니다. 운영 DB의 마이그레이션 전 백업은 `/var/backups/parkick/admin-rejected-20261025-1/parkick-before-rejected.dump`에 보관합니다. EC2의 격리 PostgreSQL에서 신규 통합 테스트 18개, 백엔드 단위 테스트 156개, 프런트엔드 lint·빌드, 운영 DB 읽기 검사와 실제 HTTPS 화면의 API 대역 브라우저 검증이 통과했습니다. 브라우저 검증은 반려 요청을 가로채 운영 신고를 변경하지 않았습니다. 실제 반려 신고가 생성된 뒤에는 이전 코드가 새 상태를 읽지 못할 수 있으므로 단순 코드 롤백 대신 새 상태를 이해하는 수정본으로 복구해야 합니다.
+
+`20261025-collection-field-1`에서는 휴대전화 수거 모드에서 가까운 신고 목록을 먼저 보여주고 지도를 필요할 때 펼치게 했습니다. 상세 확인과 처리 후에는 수거 모드의 페이지·선택 항목·목록 스크롤 위치로 돌아옵니다. 각 신고의 도보·차량 길찾기는 네이버 지도 앱 URL Scheme으로 연결하며 목록의 거리는 이동 거리나 시간이 아닌 직선거리로 표시합니다. 수거 모드가 화면에 열려 있을 때만 GPS를 갱신하고 정확도·마지막 확인 시각을 표시합니다. 현장 상세에서는 업체·기기번호·위치·접수 시각과 사진 다음에 수거 완료 버튼을 배치하고, QR 재확인은 선택 기능으로 제공합니다. 현장에 기기가 없다면 반려 사유를 시민에게 공개되는 메모에 입력하도록 했습니다. EC2에서 프런트엔드 lint·빌드·단위 테스트 16개가 통과했고, 실제 HTTPS 화면에서 모든 관리자 API를 대역한 모바일 브라우저 검사 4개가 통과했습니다. 시험 신고와 운영 DB 변경은 없었습니다. 휴대전화의 실제 네이버 앱 전환과 이동 중 GPS는 실기기에서 추가 확인해야 합니다.
+
+`20261024-mobile-steps-2`는 QR 확인·위치 확인·신고 유형 화면을 높이 667px인 모바일 화면에도 맞추는 추가 CSS 수정본입니다. 위치 단계의 좌표·정확도 카드와 평상시 수동 위도·경도 입력은 제거하고, GPS 또는 지도 오류 때 수동 입력을 보여줍니다. EC2 전환과 API health 검증을 완료했으며 운영 브라우저의 최종 화면 검증은 별도로 기록합니다.
+
+`20261024-mobile-steps-3`은 모바일 단계 이동 시 제목에 초점을 맞추되 자동 부드러운 스크롤을 피하고 화면을 맨 위로 되돌립니다. 이전 위치 단계 화면 검사에서 상단 헤더가 보이지 않는 상태가 있어, 최종 검증은 헤더를 포함한 스크롤 위치 0에서 다시 수행했습니다. EC2 배포와 실제 HTTPS 모바일 화면 검증을 완료했습니다.
+
+`20261024-mobile-steps-4`에서는 높이 667px 화면의 QR 단계에서 **기타 업체**를 입력할 때도 다음 버튼이 보이도록 업체 선택과 기타 업체명 필드를 나란히 배치했습니다. 새 빌드의 실제 HTTPS 브라우저 검증에서 390×844와 390×667 화면 모두 스크롤 없이 다음 버튼이 보였습니다.
+
+`20261024-mobile-steps-5`는 같은 두 열 배치를 높이와 무관하게 모바일 화면 전체에 적용했습니다. 실제 HTTPS 브라우저의 390×844 화면에서 기타 업체를 선택했을 때 다음 버튼 하단이 817px로 확인됐고, 390×667 화면에서도 619px로 보였습니다.
+
+`20261024-mobile-steps-7`에서는 신고 화면의 모바일 전용 푸터·중복 설명·단계 하단 문구와 불필요한 아래 여백을 제거해, 버튼만 보이는 수준을 넘어 문서 전체가 화면 높이에 맞게 했습니다. 실제 HTTPS 브라우저에서 390×844·390×667의 QR 기본/수동/기타 업체, 정상 GPS 위치, 신고 유형 일반/기타 화면 모두 페이지 높이가 화면 높이와 같았습니다.
+
+`20261024-admin-collect-area-1`에서는 관리자 신고 상세와 같은 기기 신고 함께 처리에서 신규 완료 선택을 `수거 완료`로 통일하고 `견인 완료` 버튼을 제거했습니다. 과거 견인 기록은 이력의 정확성을 위해 그대로 표시합니다. 기존 시연 기관·지역에 속한 신고는 목록·상세 화면에서 시연 명칭을 표시하지 않고 입력된 주소의 시·군·구를 `경기도 용인`처럼 신고 지역으로 표시합니다. 이는 화면의 주소 기반 표기이며 DB의 관할·기관 배정이나 관리자 접근 범위를 변경하지 않습니다. 운영 DB에는 주소 기준 용인 8건·그 외 1건이 있어 일괄 용인 표기로 바꾸지 않았습니다. 새 릴리스에서 Frontend lint·운영 빌드, API health와 외부 HTTPS 상세 경로 200을 확인했고 시험 신고는 생성하지 않았습니다.
 
 **Phase 5 수정본을 EC2에 반영했고 Linux 운영 빌드·health 및 실제 HTTPS 브라우저의 신고→전화번호 조회 검증을 통과했습니다.** 전화번호 목록·상세 조회와 XHR의 5분 제출 대기·실측 진행률을 구현했으며 로컬에서 Frontend lint·운영 빌드, Backend lint·테스트 74개, PostgreSQL 통합 총 11개(기존 8개·조회 3개), 제출 브라우저 7개(65초 지연 1개 포함), Phase 1 회귀 3개를 통과했습니다. 로컬에서는 전체 Wizard 제출부터 실제 DB 목록·상세, 뒤로 이동·번호 변경 초기화·직접 상세 재입력까지 확인했습니다.
 
@@ -20,28 +46,30 @@
 | EC2 | `sgu-202686-ec2` / `i-0a95ee1a77e3722a4`, Ubuntu 24.04, `t3.small` 2 vCPU·2GiB, 실행 중·상태 검사 2/2 통과 |
 | 디스크·CPU | 암호화된 30GiB gp3, 인스턴스 종료 시 볼륨 보존(`DeleteOnTermination=false`), CPU 크레딧 Standard |
 | 네트워크 | 공인 IP `15.165.235.154`, SG `sg-005d27768eef97969`; 웹 80·443 공개, SSH 22는 사용자 요청으로 `0.0.0.0/0` 허용 유지 |
-| 사진 저장 | EC2의 `/var/lib/parkick/reports`, `parkick:parkick` 소유·폴더 0700/파일 0600 권한; 개발 PC는 기존 `backend/data/reports` 사용 |
-| S3 | `sgu-202686-s3`는 향후 전환용으로 보존; 퍼블릭 액세스 차단 네 항목 활성화, Bucket owner enforced, SSE-S3(AES256) |
-| 실제 검증 | 개발 PC의 `npm.cmd run aws:check`로 `reports/` 아래 테스트 JPEG 쓰기·읽기·바이트 비교·삭제 통과 |
+| 사진 저장 | 운영 신규 사진과 기존 6장의 활성 경로는 `sgu-202686-s3/reports/`; EC2의 `/var/lib/parkick/reports`에는 이전 원본을 복구용으로 보존 |
+| S3 | `sgu-202686-s3`: 퍼블릭 액세스 차단 네 항목 활성화, Bucket owner enforced, SSE-S3(AES256); 기존 `SafeInstanceProfile-sgu-202686` 연결 |
+| 실제 검증 | 개발 PC와 EC2 `parkick` 서비스 계정에서 `reports/` 임시 객체 쓰기·읽기·바이트 비교·삭제 통과; 기존 6장 S3 조회·해시 확인 |
 | 설치·빌드 | Node 22.23.3·PostgreSQL 16·Nginx, `npm ci`·Frontend/Backend 운영 빌드·Migration·시연 seed 성공 |
-| 실행 상태 | API·Nginx·PostgreSQL 활성화; production·DB configured·private-local, 접수 상태 available=true·local, 사진 디렉터리 0700 |
-| HTTPS | Certbot snap 5.8.0, Let’s Encrypt shortlived IPv4 인증서 발급·Nginx 적용; 발급자 YE2, 확인 당시 만료 2026-10-22 11:45:26 KST |
+| 실행 상태 | API·Nginx·PostgreSQL 활성화; production·DB configured·private-s3, 접수 상태 available=true·s3 |
+| HTTPS | Certbot snap 5.8.0, Let’s Encrypt shortlived IPv4 인증서 발급·Nginx 적용; 2026-10-23 재확인 만료 2026-10-29 12:13:11 UTC, 외부 HTTPS 기본 인증서 검증 통과 |
 | 갱신 | `snap.certbot.renew.timer` enabled·active; renew dry-run·deploy hook 종료 코드 0, 모의 갱신 전체 성공 확인 |
 | 외부 API 검증 | 6개 통과: health/API, SPA 3개 경로·JS 번들, HTTP→HTTPS, 전화번호 없는 테스트 신고 201·재전송 200, 공개 신고 사진 API 404 |
 | 모바일 Chrome | 390×844에서 secure context·홈 이미지·직접 입력→사진 단계·직접 주소 새로고침·런타임 오류 없음, 5개 통과 |
 | 실제 저장·정리 | 테스트 신고의 DB 관계·JPEG 해시·EXIF 제거·파일 권한·실제 사진 경로의 비공개 접근 검증 통과; 생성한 테스트 신고·관계 데이터·사진 1개만 정리 완료 |
-| 현재 릴리스 | `/srv/parkick/app` → `/srv/parkick/releases/20261017-photo-upload-1`; 2026-10-17 01:04:41 KST 배포; 사진 업로드 전 축소·압축과 실제 사이트 검증 완료 |
-| Phase 5 배포 검증 | 실제 HTTPS 모바일 390px의 6단계 신고→201→완료 영수증→번호 목록 200·no-store→상세 처리 이력 통과; 가로 넘침·브라우저 번호 저장 없음, 상세 새로고침 시 재입력 확인 |
+| 현재 배포 릴리스 | `/srv/parkick/app` → `/srv/parkick/releases/20261025-admin-rejected-1`; 관리 모드에 반려 집계·실제 반려 처리 추가, 기존 PC 상단 메뉴·모바일 햄버거·수거 모드 유지, 이전 `20261025-admin-top-nav-1` 보존 |
+| Phase 5 과거 배포 검증 | 당시 실제 HTTPS 모바일 390px의 6단계 신고→201→완료 영수증→번호 목록 200·no-store→상세 처리 이력 통과; 새 5단계의 검증 결과가 아님 |
 | Phase 5 운영 테스트 자료 | 테스트 2건의 표식·UUID·접수번호·내용·해시 일치를 확인하고 해당 DB 관계·사진만 정리 완료; 기존 사용자 데이터 유지 |
 | 관리자 인증 검증 | 지정 플랫폼 관리자 등록 후 2026-10-15 23:31:34 KST(14:31:34 UTC)에 실제 로그인·새로고침·로그아웃과 기존 토큰 무효화 통과; production·개발 Mock 비활성화·기존 DB·사진·전화번호 키 유지 |
-| 관리자 신고 관리 | DB 대시보드·목록·상세·사진·권한·처리중/수거/견인·메모 로컬·EC2 검증 완료 |
-| Bedrock | 기존 Lambda 구성 및 로컬 Invoke DryRun 확인; 직접 호출용 최소 권한 JSON·관리자 안내 준비. 모델 호출 0회, 기존 인스턴스 프로필은 EC2 미연결·유효 권한 미검증, AI disabled 유지 |
+| 관리자 신고 관리 | DB 대시보드·목록·상세·사진·권한·처리중/수거 완료·메모 연동; 과거 견인 이력 보존 |
+| 사진 내용 판별 | 운영 `AI_PROVIDER=litellm`; 외부 HTTPS 사전 검사에서 공유 킥보드 사진 200·무관 JPEG 422. 최종 신고 제출은 미검증. 직접 EC2 Bedrock 호출은 별도 대안 |
 | Client ID 최신 반영 | 2026-10-16 16:12:57 KST Frontend 재빌드·배포 완료; 새 ID로 지도·타일 9개 표시 확인, 주소 API는 여전히 HTTP 403 |
 | 후속 작업 | 테넌트 계정 생성 UI·실제 관할 등록, 통계, 실제 휴대전화·백업 등 운영 검증 |
 
-최초 SSH 문제는 웹 IP 조회 결과 `211.234.206.233`과 당시 실제 SSH 출발지 `211.234.206.163`의 차이로 발생해 출발지 확인 후 해결했습니다. 이후 `211.37.75.121/32` 제한으로 재접속을 확인했으며, 현재는 사용자의 최신 요청에 따라 TCP 22를 **`0.0.0.0/0`**에 계속 허용합니다. 자동 만료·복원은 없으며 사용자가 명시적으로 요청할 때만 변경합니다. Git SSH의 ED25519 호스트 키를 확인·고정해 사용합니다. Windows keyscan은 KEX 오류로 사용하지 않았습니다. Instance Connect Endpoint는 생성하지 않았으며 필요하지 않습니다. `SafePowerUser`의 역할 생성 거부는 향후 S3 전환 시 [IAM 관리자 절차](iam-admin-setup.md)로 해결할 사항입니다.
+최초 SSH 문제는 웹 IP 조회 결과 `211.234.206.233`과 당시 실제 SSH 출발지 `211.234.206.163`의 차이로 발생해 출발지 확인 후 해결했습니다. 이후 `211.37.75.121/32` 제한으로 재접속을 확인했으며, 현재는 사용자의 최신 요청에 따라 TCP 22를 **`0.0.0.0/0`**에 계속 허용합니다. 자동 만료·복원은 없으며 사용자가 명시적으로 요청할 때만 변경합니다. Git SSH의 ED25519 호스트 키를 확인·고정해 사용합니다. Windows keyscan은 KEX 오류로 사용하지 않았습니다. Instance Connect Endpoint는 생성하지 않았으며 필요하지 않습니다. `SafePowerUser`는 새 역할 생성을 거부하지만, 기존 EC2 인스턴스 프로필을 연결해 S3 전환을 완료했습니다.
 
-현재 배포 소스 아카이브의 SHA-256은 `e48f081af96fa1b579c7abefc7af59750ed795aa650504c9bb074a3ee26bca1f`입니다. 현재 릴리스와 검증 상태는 [deployment-status.json](deployment-status.json)에서도 확인할 수 있습니다.
+**이전 릴리스 기록:** `20261021-qr-step-1`은 `20261019-demo-label-1`을 복제해 변경 파일만 설치했으며 새 소스 아카이브는 만들지 않았습니다. 기반 릴리스의 원본 소스 아카이브 SHA-256은 `537aa706d8768360721dc945bc5a8fd6e1a625756d53e59104c01c84f158b646`입니다. 현재 운영 상태는 [deployment-status.json](deployment-status.json)에서 확인할 수 있습니다.
+
+**2026-10-22 현재 릴리스 확인:** `/srv/parkick/releases/20261022-five-step-deferred-1`로 전환했습니다. 외부 HTTPS에서 `/api/health`와 `/api/reports/status`가 정상 응답했고 접수 준비 상태는 `available: true`, 사진 판별 모드는 `disabled`였습니다. `POST /api/reports/validate-photos`는 합성 정상 PNG에 200, PNG로 위장한 텍스트에 400을 반환했습니다. 헤드리스 데스크톱 Chrome의 390px 모바일 화면 크기로 실제 HTTPS `/report`를 읽기 전용 검사해 `STEP 01/05`에서 빔과 기기번호를 수동 입력한 뒤 사진 `STEP 02/05`로 이동했고 AI 비활성·형식 검사 안내와 런타임 오류 0건을 확인했습니다. 실제 휴대전화는 사용하지 않았습니다. Nginx의 API `proxy_send_timeout`·`proxy_read_timeout`을 300초로 설정하고 `nginx -t`를 통과했습니다. 실제 신규 신고 제출·브라우저 전체 흐름과 Bedrock 이미지 판정은 검증하지 않았고 운영 테스트 신고도 생성하지 않았습니다.
 
 리소스 식별자는 [deployment-status.json](deployment-status.json)에 기록합니다. SSH 개인 키는 버전 관리에서 제외된 로컬 `.tmp/aws/sgu-202686-key.pem`에 보관하며 소스 업로드나 문서 공유에 포함하지 않습니다. 초기 배포와 외부 API·브라우저·갱신 검사를 완료했으며 후속 운영 검증을 포함하는 Phase 8 전체 완료와는 구분합니다.
 
@@ -53,8 +81,8 @@
 | `parkick-api.service` | 비루트 계정으로 실행하는 systemd 서비스 |
 | `nginx-http-bootstrap.conf` | 최초 인증서 발급을 위한 HTTP 임시 설정 |
 | `nginx-parkick.conf` | HTTPS, SPA 라우팅, API 프록시 설정 |
-| `iam-s3-reports-policy.json` | 향후 S3 전환용 `reports/*` 객체 접근 정책 |
-| `iam-admin-setup.md` | 향후 S3 전환 시 관리자가 EC2 역할을 생성·연결하는 절차 |
+| `iam-s3-reports-policy.json` | S3 `reports/*` 객체 접근용 참고 정책; 운영은 기존 프로필의 검증된 권한 사용 |
+| `iam-admin-setup.md` | 연결된 EC2 역할과 AI 연동의 별도 설정·검증 절차 |
 | `deployment-status.json` | 생성한 AWS 리소스 식별자와 배포 진행 상태 |
 | `seed-demo.ts` | 최초 배포용 시연 기관·지역과 신고 유형 준비 |
 | `create-platform-admin.ts` | 표준입력 JSON으로 운영 플랫폼 관리자를 최초 등록; 기존 계정 덮어쓰기 없음 |
@@ -83,12 +111,12 @@ EC2는 Ubuntu 24.04 LTS를 기준으로 합니다. Node.js는 최신 보안 패�
 
 - 도메인을 사용할 경우 DNS 레코드를 EC2에 연결하고 예시의 `parkick.example.com`을 실제 값으로 교체합니다. 현재 배포는 도메인이 없어 공인 IPv4의 HTTPS를 사용하며 아래 7절의 IP 인증서 절차를 적용했습니다.
 - 보안 그룹은 웹용 80·443을 허용하며, SSH 22의 `0.0.0.0/0` 허용은 사용자 요청대로 계속 유지합니다. 사용자가 명시적으로 요청할 때만 변경합니다. API 4000과 PostgreSQL 5432는 외부에 열지 않습니다.
-- PostgreSQL 데이터와 신고 사진을 EC2의 지속 볼륨에 저장합니다. 서버를 교체할 때 DB·`/var/lib/parkick/reports`·전화번호 암호화 키를 함께 보존해야 합니다.
-- 초기 `local` 사진 저장은 AWS 자격증명이나 IAM 역할을 사용하지 않습니다. 생성한 S3 버킷과 공개 차단·암호화 설정은 그대로 유지합니다.
+- PostgreSQL 데이터와 전화번호 암호화 키는 EC2의 지속 볼륨에 저장합니다. 운영 사진은 S3에 있으며, 서버 교체·복구 전에는 DB와 S3 객체, 남겨둔 로컬 사진 원본을 함께 점검합니다.
+- 초기 `local` 저장은 IAM 역할을 쓰지 않았습니다. 현재 `s3` 저장은 EC2에 연결된 기존 프로필의 임시 자격증명을 사용하며 버킷의 공개 차단·암호화를 유지합니다.
 
-S3 전환에 필요한 IAM·검증 절차는 마지막 선택 항목에 분리했습니다. 초기 배포를 위해 RDS·ECS·Secrets Manager·Parameter Store를 추가하지 않습니다.
+S3 전환 결과와 재검증 절차는 9절에 기록했습니다. 초기 배포를 위해 RDS·ECS·Secrets Manager·Parameter Store를 추가하지 않았습니다.
 
-2026-10-15 확인 당시 EC2 디스크 여유는 약 22GB, 신고 사진 사용량은 약 4.6MB였습니다. 현재 테스트는 웹·API·DB·사진을 모두 EC2에서 진행할 수 있습니다. 사진이 늘어나면 웹·API·DB는 유지하고 사진 저장만 S3로 옮기는 구성을 권장하며, 기존 사진의 별도 이관이 필요합니다.
+2026-10-15 확인 당시 EC2 디스크 여유는 약 22GB, 신고 사진 사용량은 약 4.6MB였습니다. 2026-10-23에는 웹·API·DB는 EC2에 유지하고 사진 저장만 S3로 옮겼습니다. 로컬 원본을 보존하므로 디스크 사용량은 바로 줄지 않으며, 원본 정리 전에 운영 조회·복구와 백업 절차를 검증해야 합니다.
 
 ## 2. 서버와 소스 준비
 
@@ -127,7 +155,7 @@ sudo -u parkick -H npm run build
 
 2026-10-16 **16:12:57 KST(07:12:57Z)**에 사용자가 변경한 공개 Client ID로 Frontend를 다시 빌드·배포했습니다. 당시 릴리스는 `20261016-reverse-geocoding-1`이며, 백업은 그 아래 `frontend/naver-backup-20261016-id-refresh-1`입니다. 업로드 아카이브 SHA-256 `cf3eb623b3dc72780cc882e715c4818898f41f4cc345c78b363e0e73c1205b51`을 EC2에서 확인했습니다. Backend·DB는 재시작하지 않았습니다. **16:13:11 KST**에 최초 조회·수동 재시도 모두 403이고 좌표 유지·직접 입력은 정상임을 확인했으며, **16:16:57 KST**에 새 ID로 SDK 200·지도 표시·타일 9개 로드를 별도로 확인했습니다. 실제 GPS 요청·신고 제출·브라우저 오류는 없었습니다. 주소 API는 상세 오류 내용을 반환하지 않아 원인이 미확정이며 새 ID의 동일 Application에서 Dynamic Map·Reverse Geocoding 선택과 Web 서비스 URL을 확인해야 합니다.
 
-EC2 → Bedrock 직접 호출은 [최소 권한 JSON](iam-bedrock-report-policy.json)과 [관리자 설정 안내](iam-admin-setup.md)에 정리했습니다. 기존 US Claude Haiku 4.5 프로필과 미국 3개 대상 리전의 모델만 범위에 포함했습니다. 실제 역할 변경·프로필 연결·AI 활성화는 수행하지 않았습니다. 이번 재조회 시 로컬 AWS CLI의 로그인 자격증명 갱신이 실패했고 `signin:CreateOAuth2Token` 부족 가능성을 안내했습니다. 이는 모델 호출 권한 거부를 확인한 결과가 아니며, 앞서 성공한 Lambda·추론 프로필 조회 결과와 구분합니다.
+EC2 → Bedrock 직접 호출은 [최소 권한 JSON](iam-bedrock-report-policy.json)과 [관리자 설정 안내](iam-admin-setup.md)에 대안으로 정리했습니다. 기존 US Claude Haiku 4.5 프로필과 미국 3개 대상 리전의 모델만 범위에 포함했습니다. Bedrock 역할 정책 변경·AI 활성화는 수행하지 않았습니다. 2026-10-23 EC2 프로필 연결은 S3 저장을 위한 작업이며 Bedrock 호출 성공을 뜻하지 않습니다. 2026-10-22 재조회 시 로컬 AWS CLI의 로그인 자격증명 갱신이 실패했고 `signin:CreateOAuth2Token` 부족 가능성을 안내했습니다. 이는 모델 호출 권한 거부를 확인한 결과가 아니며, 앞서 성공한 Lambda·추론 프로필 조회 결과와 구분합니다.
 
 ## 3. 전용 DB·환경변수·사진 폴더 준비
 
@@ -157,7 +185,7 @@ REPORT_STORAGE_DIR=/var/lib/parkick/reports
 AI_PROVIDER=disabled
 ```
 
-운영의 `local` 저장은 저장 모드를 명시하고 절대 사진 경로·HTTPS Origin·비밀번호 DB 연결을 설정해야 합니다. DB·사진·전화번호 키는 다음 배포에서도 유지합니다. 키를 새로 만들면 기존 연락처 복호화·검색이 불가능해질 수 있으므로 함께 복구할 수 있도록 접근을 제한해 백업합니다. Bedrock은 실제 모델 권한을 확인한 뒤 별도로 활성화하며 운영에서 Mock AI나 개발 관리자 인증을 켜지 않습니다.
+위 설정은 초기 `local` 배포 예시입니다. 현재 운영은 `REPORT_STORAGE_PROVIDER=s3`, `AWS_REGION=ap-northeast-2`, `S3_REPORT_BUCKET=sgu-202686-s3`, `S3_REPORT_PREFIX=reports`를 사용하고 로컬 `REPORT_STORAGE_DIR`은 이전 사진의 복구·호환용으로 유지합니다. DB·S3 사진·전화번호 키는 다음 배포에서도 보존합니다. 키를 새로 만들면 기존 연락처 복호화·검색이 불가능해질 수 있으므로 함께 복구할 수 있도록 접근을 제한해 백업합니다. Bedrock은 별도로 활성화하며 운영에서 Mock AI나 개발 관리자 인증을 켜지 않습니다.
 
 ## 5. 마이그레이션과 최초 시연 데이터
 
@@ -282,38 +310,91 @@ sudo -u parkick test -w /var/lib/parkick/reports
 
 Phase 5에는 `POST /api/reports/lookup`과 `POST /api/reports/lookup/:publicId`를 추가했습니다. 목록은 JSON 본문의 `phone`과 선택 `page`(기본 1, 최대 1000)를 받고 20건씩 `hasMore`와 함께 반환합니다. 상세는 본문에 `phone`만 받습니다. 두 경로는 IP별 합산 분당 20회 제한을 공유하고 `no-store`를 적용합니다. 공개 응답에는 신고번호·시각·업체·유형·상태·완료 방식과 공개 처리 이력만 포함하며 신고 본문·사진·GPS·주소·전화번호/HMAC·내부 메모는 포함하지 않습니다. 전체 계약은 [프로젝트 조회 설명](../README.md#15-전화번호-기반-처리결과-조회-구조)에 있습니다.
 
-현재 수정본은 실제 배포 주소의 모바일 Chrome 390px에서 6단계 신고·201 접수·완료 영수증·번호 목록 200/no-store·상세 처리 이력까지 통과했습니다. 가로 넘침이 없고 번호가 브라우저 저장소에 기록되지 않으며 상세 새로고침 시 번호를 다시 입력하는 것도 확인했습니다. 다른 번호와의 분리·입력 변경 즉시 이전 결과 제거·페이지 이동은 로컬 통합 검사에서 확인했습니다. 번호 없는 신고는 조회되지 않습니다. 기존 DB와 전화번호 키를 그대로 사용하므로 새 OTP·SMS·인증 서비스는 준비하지 않습니다.
+2026-10-15 당시 배포본은 모바일 Chrome 390px에서 6단계 신고·201 접수·완료 영수증·번호 목록 200/no-store·상세 처리 이력까지 통과했습니다. 이는 새 5단계 사진 판별 릴리스의 실사이트 검증이 아닙니다. 번호 없는 신고는 전화번호 조회에 포함되지 않습니다. 기존 DB와 전화번호 키를 그대로 사용하며 OTP·SMS·인증 서비스는 준비하지 않습니다.
 
 `/`, `/report`를 직접 열고 새로고침했을 때 SPA가 동작하는지, 모바일 HTTPS에서 카메라·위치 권한을 사용할 수 있는지 확인합니다. 관리자 인증은 등록한 운영 계정의 로그인·새로고침 시 세션 복원·로그아웃 후 접근 거부를 확인합니다. 개발 `DEV_ADMIN_*` 계정은 운영 성공 조건으로 사용하지 않습니다. 현재 실제 EC2에서 DB 인증 모드와 쿠키 속성, 세션 복원·로그아웃 후 기존 토큰의 401 응답을 모두 확인했습니다.
 
-재배포는 `/etc/parkick/backend.env`, PostgreSQL 데이터, `/var/lib/parkick/reports`를 유지하고 `/srv/parkick/releases/릴리스명`에서 설치·운영 빌드·`migrate deploy`를 준비한 뒤 `/srv/parkick/app` 연결 대상을 전환하고 API를 재시작하는 방식입니다. 현재 대상은 `20261016-reverse-geocoding-1`이며 이전 대상 `20261016-admin-map-2`를 보존했습니다. 이번 배포에서는 스키마 변경이 없어 Migration을 실행하지 않았습니다. 기존 릴리스와 S3 버킷은 보존합니다. DB 마이그레이션 전에는 DB·사진·전화번호 키를 복구할 수 있는 백업을 확보합니다. 소스 링크 복구와 DB 스키마 롤백은 별개이므로 이전 코드로 돌아갈 때 스키마 호환성도 확인합니다.
+재배포는 `/etc/parkick/backend.env`, PostgreSQL 데이터, S3 객체와 `/var/lib/parkick/reports` 원본을 유지하고 `/srv/parkick/releases/릴리스명`에서 설치·운영 빌드를 준비한 뒤 `/srv/parkick/app` 연결 대상을 전환하고 API를 재시작하는 방식입니다. 현재 배포 대상은 `20261025-collection-field-1`이며 이전 대상 `20261025-admin-rejected-1`, `20261025-admin-top-nav-1`, `20261025-admin-list-focus-1`, `20261025-admin-sidebar-1`, `20261025-admin-collection-mode-1`, `20261024-admin-collect-area-1`, `20261024-mobile-steps-7`, `20261024-mobile-steps-6`, `20261024-mobile-steps-5`, `20261024-mobile-steps-4`, `20261024-mobile-steps-3`, `20261024-mobile-steps-2`, `20261024-mobile-steps-1`, `20261024-photo-two-1`, `20261024-report-title-1`, `20261023-photo-copy-1`, `20261023-litellm-photo-1`과 S3 호환 대상 `20261023-s3-hybrid-ready-1`을 보존했습니다. 2026-10-23 S3 이전 직전 백업은 `/var/backups/parkick/s3-cutover-20261023-1`에 검증해 두었습니다. DB 마이그레이션 전에는 DB·사진·전화번호 키를 복구할 수 있는 백업을 확보합니다. 새 S3 사진이 생긴 뒤 로컬 전용 릴리스로 돌아가면 사진을 읽지 못하므로 S3 호환 릴리스를 롤백 대상으로 사용합니다.
+
+2026-10-23 `20261023-photo-copy-1`에서는 현장사진 단계의 안내 문구 세 곳만 삭제했습니다. 프런트엔드 lint·빌드·10개 테스트가 통과했고, 운영 모바일 크기 브라우저에서 사진 촬영·갤러리 버튼과 문구 제거를 확인했습니다. API health의 `photoValidation=litellm`, `storage=private-s3` 상태도 유지됩니다. 실제 신고 제출은 실행하지 않았습니다.
+
+2026-10-24 `20261024-report-title-1`에서는 신고 단계마다 보이던 `PARKICK REPORT / 공유 킥보드 신고` 제목 영역을 제거하고 단계 표시 위 여백을 줄였습니다. 접근성용 제목과 각 단계의 제목은 유지했습니다. 프런트엔드 lint·빌드·10개 테스트를 통과했고, 운영 모바일 크기 브라우저에서 제목 영역이 사라지고 첫 단계 카드가 약 104px 위로 이동한 것을 확인했습니다. API health의 `photoValidation=litellm`, `storage=private-s3` 상태도 유지됩니다. 실제 신고 제출은 실행하지 않았습니다.
+
+2026-10-24 `20261024-photo-two-1`에서는 신규 신고의 현장사진을 최대 2장으로 제한하고, 현장사진 단계에 3미터 거리의 기기 전체 촬영·행인 얼굴과 차량번호판 주의 안내를 작게 배치했습니다. 기존 3장 신고의 세 번째 S3 사진은 계속 조회·정리할 수 있습니다. Backend 155개 테스트와 Frontend lint·빌드·10개 테스트, 집중 브라우저 테스트 2개를 통과했습니다. 운영 HTTPS 모바일 390×844에서 사진 1장·2장 모두 다음 단계 버튼이 화면 안에 있고, 세 번째 사진은 서버가 HTTP 400으로 거부하는 것을 확인했습니다. 시험 신고는 생성하지 않았습니다.
+
+2026-10-24 `20261024-mobile-steps-1`은 QR 확인·위치 확인·신고 유형 단계의 모바일 세로 여백을 줄여 EC2에 반영했습니다. 위치 단계는 기기 GPS 자동 확인과 NAVER 주소 조회·핀 이동·현재 위치 다시 확인·위치 확인란을 유지하고, 정상 상태에서는 좌표·정확도 카드와 수동 좌표 요약을 표시하지 않습니다. GPS 거부, 지도 SDK 연결·렌더링 실패 시에는 수동 좌표 입력을 사용할 수 있습니다. 로컬 지도 SDK 대역 브라우저 테스트 10개가 모두 통과 출력됐으며 정상 GPS와 주소 조회가 끝난 390×844 화면에서 다음 단계 버튼이 화면 안에 있었습니다. Windows Playwright 종료 과정은 테스트 출력 후 수동 중단했습니다. 높이 667px 화면은 추가 조정이 필요해 `20261024-mobile-steps-2`를 준비했습니다.
+
+`20261024-mobile-steps-2` 배포 전 운영 브라우저에 추가 CSS를 주입해 스크롤 위치 0에서 다음 버튼 하단을 측정했습니다. 390×844에서는 QR 기본/수동 797/744px, 위치 813px, 유형 일반/기타 658/756px였고, 390×667에서는 QR 기본/수동 588/619px, 위치 618px, 유형 일반/기타 540/628px였습니다. 모두 해당 화면 높이 안에 들어왔으며, 정상 위치 화면의 좌표 카드와 수동 입력 요약은 보이지 않았습니다. 이 수치는 CSS 주입 검사이며 새 릴리스 빌드가 실제 배포된 결과는 아닙니다. 신고 제출은 실행하지 않았습니다.
+
+이후 `20261024-mobile-steps-2`를 EC2에서 활성화하고 API health의 `photoValidation=litellm`, `storage=private-s3`를 확인했습니다. 새 빌드의 모바일 화면 실측은 별도로 검증합니다.
+
+`20261024-mobile-steps-3`은 모바일에서 단계 이동 후 제목 초점과 화면 상단 위치를 함께 맞춥니다. EC2에서 활성화한 새 빌드의 실제 HTTPS 브라우저 검사에서는 모든 단계 전환 직전 스크롤 위치가 0이었습니다. 390×844 화면에서 다음 버튼 하단은 QR 기본/수동 797/744px, 위치 793px, 유형 일반/기타 658/756px였고, 390×667 화면에서는 각각 588/619px, 608px, 553/641px였습니다. 두 화면 크기에서 버튼이 스크롤 없이 보이고 가로 넘침은 없었습니다. 정상 위치 단계의 지도는 표시됐으며 좌표 카드·수동 좌표 입력은 보이지 않았습니다. API health는 `photoValidation=litellm`, `storage=private-s3`였고 시험 신고는 생성하지 않았습니다.
+
+`20261024-mobile-steps-4`는 짧은 화면에서 QR 단계의 업체 선택과 기타 업체명 입력을 한 줄에 배치합니다. 새 빌드를 활성화한 뒤 CSS 주입 없이 실제 HTTPS 브라우저에서 단계 전환 전 스크롤 위치 0, 가로 넘침 없음을 확인했습니다. 390×844 다음 버튼 하단은 QR 기본/수동/기타 업체 797/744/839px, 위치 793px, 신고 유형 일반/기타 658/756px였습니다. 390×667에서는 QR 기본/수동/기타 업체 588/619/619px, 위치 608px, 신고 유형 일반/기타 553/641px로 모두 화면 안에 있었습니다. 위치 단계의 지도는 보이고 정상 상태의 좌표 카드·수동 좌표 입력은 보이지 않았습니다. API health는 `photoValidation=litellm`, `storage=private-s3`이며 시험 신고는 생성하지 않았습니다.
+
+`20261024-mobile-steps-5`는 QR 단계의 기타 업체 두 열 배치를 모든 모바일 높이에서 사용합니다. EC2에서 활성화한 빌드를 실제 HTTPS 브라우저로 CSS 주입 없이 확인했습니다. 390×844에서 다음 버튼 하단은 QR 기본/수동/기타 업체 797/744/817px, 위치 793px, 신고 유형 일반/기타 658/756px이고, 390×667에서는 각각 588/619/619px, 608px, 553/641px였습니다. 단계 전환 전 스크롤 위치는 0이고 가로 넘침이 없으며, 정상 위치 단계에서는 지도만 보이고 좌표 카드·수동 좌표 입력은 숨겨졌습니다. API health는 `photoValidation=litellm`, `storage=private-s3`였고 시험 신고는 생성하지 않았습니다.
+
+`20261024-mobile-steps-6`은 모바일 신고 화면의 푸터·중복 문구·아래 여백을 줄인 중간 릴리스입니다. 실제 390×844 화면에서 CSS 적용 순서 때문에 아래 여백 38px이 남아 문서 높이가 853px인 것을 확인했습니다. `20261024-mobile-steps-7`에서 선택자 우선순위를 바로잡은 뒤 실제 HTTPS 브라우저를 CSS 주입 없이 검사했습니다. 390×844와 390×667 모두 QR 기본/수동/기타 업체, 정상 GPS 위치, 신고 유형 일반/기타 화면에서 **문서 높이가 화면 높이와 같고** 전환 전 스크롤 위치는 0이며 가로 넘침이 없었습니다. 다음 버튼 하단은 390×844에서 QR 797/744/817px, 위치 793px, 신고 유형 658/756px였고 390×667에서 QR 588/619/619px, 위치 608px, 신고 유형 553/641px로 화면 안에 있었습니다. 정상 위치 화면의 지도는 보이고 좌표 카드·수동 좌표 입력은 숨겨졌습니다. API health는 `photoValidation=litellm`, `storage=private-s3`였으며 시험 신고는 생성하지 않았습니다.
 
 설정을 변경할 때는 실제 Ubuntu 호스트의 `nginx -t`·`systemd-analyze verify`로 확인합니다. 현재 외부 API 접수·재시도와 모바일 Chrome 초기 흐름·갱신 검사는 통과했습니다. 모바일 화면 설정의 브라우저 검사는 실제 휴대전화 카메라·GPS·전체 현장 신고 검증과 구분합니다.
 
-## 9. 선택 사항: 나중에 사진을 S3로 전환
+## 9. 사진을 S3로 전환
 
-S3 어댑터와 비공개 버킷 `sgu-202686-s3`는 준비되어 있습니다. 개발 PC에서는 2026-10-15에 `npm.cmd run aws:check`로 테스트 JPEG 쓰기·읽기·내용 비교·삭제를 확인했습니다. EC2에서 S3로 전환할 때만 [IAM 관리자 절차](iam-admin-setup.md)에 따라 인스턴스 역할을 연결합니다. SDK는 역할의 임시 자격증명을 사용하며 개발 PC의 프로파일·로그인 캐시·장기 키를 서버에 복사하지 않습니다. [AWS EC2 IAM 역할 문서](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html)
+S3 어댑터와 비공개 버킷 `sgu-202686-s3`를 운영에 적용했습니다. 개발 PC 로그인 프로필 `parkick`(IAM 사용자 `sgu-202686`)과 EC2에 연결한 `SafeInstanceProfile-sgu-202686` 역할에서 각각 임시 객체 쓰기·읽기·내용 비교·삭제를 확인했습니다. EC2 SDK는 역할의 임시 자격증명을 사용하며 개발 PC의 프로파일·로그인 캐시·장기 키를 서버에 복사하지 않았습니다. 연결된 프로필의 association ID는 `iip-assoc-0a7d3a8136ba4ba4b`이며 상태는 `associated`입니다. [AWS EC2 IAM 역할 문서](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html)
 
-S3 공개 차단·Bucket owner enforced·SSE-S3를 유지하고 `reports/*`의 `PutObject`, `GetObject`, `DeleteObject`만 허용합니다. 버저닝을 사용할 경우 연결 검사의 버전 지정 조회·삭제에 `GetObjectVersion`, `DeleteObjectVersion` 권한도 필요합니다. `HeadBucket`은 버킷 목록 권한을 요구하므로 이 최소 정책의 연결 확인에 사용하지 않습니다. [S3 권한 범위](https://docs.aws.amazon.com/us_en/AmazonS3/latest/userguide/access-policy-language-overview.html), [HeadBucket 권한](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadBucket.html)
+S3 공개 차단·Bucket owner enforced·SSE-S3를 유지합니다. Parkick의 최소 필요 권한은 `reports/*`의 `PutObject`, `GetObject`, `DeleteObject`이며, 연결 검사에서 이 세 작업이 실제 성공했습니다. 기존 역할의 전체 유효 정책은 조회 제한으로 확인하지 못했으므로 권한이 이 범위에만 제한됐다고 단정하지 않습니다. 버저닝을 사용할 경우 버전 지정 조회·삭제에는 `GetObjectVersion`, `DeleteObjectVersion` 권한도 필요합니다. `HeadBucket`은 버킷 목록 권한을 요구하므로 연결 확인에 사용하지 않습니다. [S3 권한 범위](https://docs.aws.amazon.com/us_en/AmazonS3/latest/userguide/access-policy-language-overview.html), [HeadBucket 권한](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadBucket.html)
 
-환경파일의 저장 모드와 AWS 리전·버킷을 명시적으로 변경한 후 서버에서 아래 선택적 연결 검사를 수행합니다. 이 검사는 S3 테스트 객체를 생성·조회·삭제하므로 초기 EC2 로컬 배포 검증에서는 실행하지 않습니다.
+서버에서 다음 검사를 실행해 `reports/` 아래 임시 객체를 생성·조회·삭제했습니다. 설정 변경 후 권한을 재확인할 때 같은 명령을 사용할 수 있습니다.
 
 ```bash
 cd /srv/parkick/app
-sudo -u parkick node --env-file=/etc/parkick/backend.env --import tsx backend/scripts/check-aws.ts
+sudo -u parkick env REPORT_STORAGE_PROVIDER=s3 AWS_REGION=ap-northeast-2 S3_REPORT_BUCKET=sgu-202686-s3 S3_REPORT_PREFIX=reports \
+  node --env-file=/etc/parkick/backend.env --import tsx backend/scripts/check-aws.ts
 ```
 
-`REPORT_STORAGE_PROVIDER=s3`로 바꾸어도 기존 사진은 자동 이전되지 않습니다. 기존 로컬 사진과 DB 메타데이터의 별도 이관·검증을 먼저 계획하고, 서버에서 새 신고의 S3 저장·실패 시 정리를 확인합니다. 브라우저는 백엔드를 통해 업로드하므로 S3 CORS는 필요하지 않으며, 관리자 인증·테넌트 범위를 검사하는 비공개 사진 조회 API는 구현·로컬 검증과 EC2 배포·실제 HTTPS 검증을 완료했습니다.
+2026-10-23 S3 전환 직전 DB 사진 6장(총 12,195,775바이트)은 모두 로컬 파일의 크기·SHA-256과 일치했습니다. `/var/backups/parkick/s3-cutover-20261023-1`에 운영 환경파일·DB dump·사진 tar를 백업해 확인한 뒤 S3로 업로드·검증하고 DB 경로를 한 트랜잭션으로 변경했습니다. 이전 도구 `backend/scripts/migrate-local-evidence.ts`의 `--verify`는 6장 통과, 이후 `--dry-run`의 미이전 사진은 0장이었습니다. 별도 사후 검사에서 실제 6장을 `S3EvidenceStorage` 서명 URL로 각각 GET해 다운로드 크기와 SHA-256이 DB 메타데이터와 전부 일치함을 확인했습니다. 원본 파일과 manifest `/var/lib/parkick/evidence-migration-20261023.json`을 보존했습니다. 합성 이미지에 대한 애플리케이션 S3 어댑터 업로드·서명 URL GET·SHA-256 비교·삭제도 통과했습니다. 운영 관리자·시민 브라우저에서의 실제 사진 화면과 신규 신고는 아직 별도 검증이 필요합니다.
 
-## 10. 선택 사항: Bedrock 연결 검사
+운영 환경파일은 `REPORT_STORAGE_DIR=/var/lib/parkick/reports`를 복구용으로 유지하면서 `REPORT_STORAGE_PROVIDER=s3`, `AWS_REGION=ap-northeast-2`, `S3_REPORT_BUCKET=sgu-202686-s3`, `S3_REPORT_PREFIX=reports`로 설정했습니다. API 재시작 후 `/api/health`는 `private-s3`, `/api/reports/status`는 `available=true`였습니다. 새 사진은 S3에 쓰고, 이전 사진도 DB의 S3 키로 조회합니다. 브라우저는 백엔드를 통해 업로드하므로 S3 CORS는 필요하지 않습니다.
 
-`BEDROCK_REGION`은 AI 전용 리전이며 비워 두면 `AWS_REGION`을 사용합니다. S3 서울 `ap-northeast-2`와 Bedrock 버지니아 `us-east-1`을 분리할 수 있습니다. 실제 자격증명·모델 호출 확인 전까지 운영 `AI_PROVIDER=disabled`를 유지합니다.
+```bash
+cd /srv/parkick/app
+sudo -u parkick node --env-file=/etc/parkick/backend.env --import tsx backend/scripts/migrate-local-evidence.ts --dry-run
+sudo -u parkick node --env-file=/etc/parkick/backend.env --import tsx backend/scripts/migrate-local-evidence.ts --verify --manifest /var/lib/parkick/evidence-migration-20261023.json
+sudo -u parkick node --env-file=/etc/parkick/backend.env --import tsx backend/scripts/migrate-local-evidence.ts --dry-run
+```
 
-2026-10-16 로컬 `parkick` 프로파일의 `sgu-202686` 사용자 로그인을 복구했습니다. `SafeInstanceProfile-sgu-202686`이 존재함을 확인했지만 현재 EC2 인스턴스 프로필은 미연결이며 IMDS `iam/info`는 404입니다. API 서비스의 AWS 자격증명 환경변수와 `parkick` 서비스 계정의 `.aws` 파일도 없으므로 현재 EC2에서는 Bedrock 직접 호출과 Lambda 호출 모두 실행 자격증명이 없습니다. 기존 프로필의 EC2 신뢰 설정·필요 권한을 확인한 뒤 연결하고 서버 실행 환경에서 검증해야 합니다. 이번에는 프로필을 연결하지 않았으며 개발 PC의 키·로그인 캐시를 서버에 복사하지 않았습니다. 기존 [S3 역할 정책](iam-s3-reports-policy.json)은 Bedrock 호출을 허용하지 않습니다.
+이 도구는 DB에 기록된 로컬 사진의 크기·해시와 S3에서 다시 읽은 내용을 확인한 뒤 DB 경로를 한 번에 변경했습니다. `--rollback --manifest <같은 절대경로>`는 보존한 로컬 원본을 재검증하고 DB 경로만 되돌리며 S3 사본은 삭제하지 않습니다. 원본과 manifest는 조회·복구 확인 전까지 보존합니다. 새 S3 신고가 생긴 뒤에는 로컬 전용 구 릴리스로 코드만 되돌리면 그 사진을 읽을 수 없으므로 S3 호환 릴리스를 롤백 대상으로 사용합니다. 이 검사는 객체 목록 권한(`s3:ListBucket`) 없이 지정된 키의 쓰기·읽기·삭제만 사용합니다.
 
-Lambda는 필수가 아니며 현재 EC2의 직접 Bedrock 호출 Provider를 사용할 수 있습니다. Lambda 경유 시 EC2에 `lambda:InvokeFunction`, Lambda 실행 역할에 `bedrock:InvokeModel` 권한이 필요합니다. [Lambda 호출 권한](https://docs.aws.amazon.com/lambda/latest/api/API_Invoke.html)
+## 10. 내부 LiteLLM 프록시 현장 사진 판별
 
-기존 함수의 확인 결과는 다음과 같습니다.
+제공된 내부 API는 `https://52.78.77.90`에서 유효한 TLS 인증서를 제공하며 LiteLLM 1.102.0 Swagger를 노출합니다. 인증된 `GET /v1/models`에서 `bedrock-haiku`, `bedrock-sonnet`, `bedrock-gpt-5.6-luna`를 확인했습니다. 합성 사과 JPEG를 `bedrock-haiku`로 `POST /v1/chat/completions`에 보낸 시험은 HTTP 200과 무관 사진이라는 JSON 판정을 반환했습니다. 첫 운영 양성 사전 검사에서 모델이 완전한 JSON 코드 블록 뒤에 설명 문장을 덧붙여 503이 발생했습니다. 응답 해석을 보완하고 회귀 검사를 추가한 뒤 같은 외부 HTTPS 사전 검사에서 공유 킥보드 사진 200·`valid=true`, 무관 JPEG 422·`PHOTO_NOT_PM`을 확인했습니다. 로컬 백엔드 테스트 153개·TypeScript·ESLint, 프런트엔드 빌드·lint·테스트 10개와 EC2 릴리스의 프런트엔드·백엔드 빌드·백엔드 테스트 143개가 통과했습니다. 최종 신고 제출·실제 휴대전화 흐름은 아직 검증하지 않았습니다.
+
+양성 시험에는 [Wikimedia Commons의 공개 공유 킥보드 사진](https://commons.wikimedia.org/wiki/File:Shared_electric_kick_scooters_in_Tomasz%C3%B3w_Mazowiecki,_Poland.jpg)을 사용했고, 음성 시험은 생성한 무관한 JPEG를 사용했습니다. 두 검사 모두 최종 신고를 만들지 않았습니다.
+
+운영 EC2의 접근 제한된 `/etc/parkick/backend.env`에 아래 구성을 적용했습니다. 백엔드는 `x-litellm-api-key` 헤더로 프록시를 인증합니다. 제공된 키는 이 환경파일에 `root:parkick`, 권한 `0640`으로 보관하며 실제 값은 소스·문서·배포 로그·Frontend 환경변수에 기록하지 않습니다.
+
+```dotenv
+AI_PROVIDER=litellm
+LLM_API_BASE_URL=https://52.78.77.90
+LLM_API_KEY=<서버의 비공개 환경파일에만 설정>
+LLM_REPORT_MODEL_ID=bedrock-haiku
+```
+
+`litellm` 모드에서는 EC2 백엔드가 HTTPS 프록시에 정제한 이미지 요청을 보냅니다. 프록시 뒤의 Bedrock 모델 호출은 프록시 측에서 처리하므로 Parkick EC2 역할에 직접 `bedrock:InvokeModel` 권한을 추가하지 않았습니다. 현재 역할의 S3 저장 권한과 서울 `AWS_REGION=ap-northeast-2` 설정은 그대로 사용합니다. 외부 HTTPS의 사전 사진 검사는 통과했으며 최종 `POST /api/reports`의 실제 제출·재시도와 운영 브라우저 사진 조회는 남아 있습니다. 이번 검사는 실제 신고를 생성하지 않았습니다.
+
+## 11. 기존 대안: Bedrock 직접 현장 사진 판별
+
+아래 직접 Bedrock 호출 절차는 내부 LiteLLM 프록시 대신 EC2에서 AWS 모델을 직접 호출하기로 별도 결정할 때의 대안입니다. EC2 역할의 모델 권한과 직접 이미지 호출은 검증되지 않았습니다. 현재 운영 사진 판별은 `AI_PROVIDER=litellm`입니다.
+
+새 5단계 소스는 현장 사진 단계의 `POST /api/reports/validate-photos`와 최종 `POST /api/reports`에서 사진을 검사합니다. `AI_PROVIDER=disabled`이면 사진 형식·크기만 검사하고 신규 신고를 접수합니다. 현재 `litellm` 경로에도 EC2의 직접 Bedrock 권한은 필요하지 않지만 S3 사진 저장에는 연결된 EC2 역할이 필요합니다. 직접 `bedrock`을 활성화하면 두 시점에 이미지 내용을 판별하고 무관한 사진의 재첨부를 안내합니다. 이때 모델 오류·시간 초과·권한 거부 시에는 접수를 막습니다. 운영 `mock`은 허용하지 않습니다. 직접 호출용 모델 권한과 실제 이미지 호출을 검증한 뒤에만 해당 대안으로 전환합니다.
+
+`BEDROCK_REGION`은 직접 Bedrock 호출용 AI 리전이며 비워 두면 `AWS_REGION`을 사용합니다. 현재 신고 사진 저장은 S3이고 사진 판별은 `AI_PROVIDER=litellm`입니다. 향후 직접 Bedrock 대안을 선택할 경우 판별용으로 정제·축소한 JPEG만 `us-east-1`의 `us.anthropic.claude-haiku-4-5-20251001-v1:0` Converse 프로필에 보냅니다. 이 US 프로필은 미국 내 `us-east-1`·`us-east-2`·`us-west-2`로 라우팅될 수 있습니다. 전화번호·QR 원문·위치 좌표는 모델 요청에 포함하지 않습니다. [Haiku 4.5의 이미지·Converse 지원](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-haiku-4-5.html), [Converse 이미지 요청](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html)
+
+**2026-10-22 운영 EC2의 과거 상태:** 당시 `parkick-api`는 `AI_PROVIDER=disabled`, `AWS_REGION` 빈 값, `BEDROCK_REGION` 미설정이었고 IMDSv2 `iam/info`는 404였습니다. 2026-10-23에는 기존 프로필을 연결해 S3를 활성화했고 이후 LiteLLM 사진 판별을 배포했습니다. EC2에서 직접 Bedrock 이미지 호출은 시험하지 않았습니다. 개발 PC의 키·로그인 캐시는 서버에 복사하지 않았습니다. 기존 [S3 역할 정책](iam-s3-reports-policy.json)은 Bedrock 호출을 허용하지 않습니다.
+
+Lambda는 필요하지 않으며 새 사진 판별 서비스는 EC2에서 Bedrock을 직접 호출하도록 작성했습니다. 이 호출에는 추론 프로필과 대상 리전의 모델 ARN에 `bedrock:InvokeModel` 권한이 필요합니다. [추론 프로필 권한 조건](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-prereq.html)
+
+기존 챗봇 함수의 **2026-10-16 당시** 확인 결과는 다음과 같습니다. 사진 판별 호출의 성공 여부를 뜻하지 않습니다.
 
 | 항목 | 2026-10-16 확인 결과 |
 | --- | --- |
@@ -325,18 +406,37 @@ Lambda는 필수가 아니며 현재 EC2의 직접 Bedrock 호출 Provider를 �
 | 추론 대상 리전 | `us-east-1`·`us-east-2`·`us-west-2`; 버지니아에 한정되지 않음 |
 | 미확인 권한 | `GetPolicyVersion`·`GetRole`·`GetRolePolicy`·`SimulatePrincipalPolicy` 제한으로 정책 본문·신뢰 정책·유효 권한 미확인; 실제 Bedrock 모델 호출 0회 |
 
-현재 신고문 생성 Provider를 활용하는 **EC2 직접 호출을 권장**합니다. 기존 Lambda는 대화 이력 저장이 포함된 챗봇 함수이므로 재사용하려면 해당 동작을 제거하거나 신고문 전용 함수를 별도로 구성해야 합니다. 이번에는 함수·역할·정책을 변경하지 않았고 운영 AI는 비활성화 상태를 유지합니다. 로컬 DryRun 성공과 추론 프로필 ACTIVE만으로 모델 실행 성공을 판정하지 않습니다.
+기존 Lambda는 DynamoDB 대화 이력을 저장하는 챗봇 함수여서 현장 사진 판별에 사용하지 않습니다. 로컬 Lambda DryRun 성공과 추론 프로필 ACTIVE만으로 EC2의 직접 이미지 호출 성공을 판단할 수 없습니다. 2026-10-23에 EC2 인스턴스 프로필을 S3 저장용으로 연결했지만 Lambda·역할 정책은 변경하지 않았습니다. 운영 사진 판별은 LiteLLM 프록시 경로를 사용합니다.
 
-직접 호출 검사를 준비할 때 프로젝트 루트의 `backend/.env`에 `AWS_PROFILE=parkick`, `BEDROCK_REGION=us-east-1`, `BEDROCK_REPORT_MODEL_ID=amazon.nova-micro-v1:0`을 설정하고 다음 검사를 실행합니다. `AI_PROVIDER=disabled`인 상태에서도 검사할 수 있습니다. 이 예시 Amazon 모델은 기존 Lambda의 Claude 모델과 다르므로 결과를 서로의 권한 검증으로 해석하지 않습니다.
+사진 판별 모델은 프로젝트 루트에서 `npm run aws:check:photo --workspace backend`로 검사합니다. `backend/.env`에 `BEDROCK_REGION=us-east-1`, `BEDROCK_REPORT_MODEL_ID=us.anthropic.claude-haiku-4-5-20251001-v1:0`과 유효한 로컬 AWS 인증을 설정해야 합니다. 스크립트는 생성한 사과 JPEG만 보내고 **`PHOTO_NOT_PM` 판정이 나오면 성공**으로 처리합니다. 실제 신고 사진이나 연락처는 읽지 않으며 소량의 모델 호출 요금이 발생할 수 있습니다.
+
+```bash
+npm run aws:check:photo --workspace backend
+```
+
+운영 EC2에서는 역할 연결과 운영 환경파일 설정 뒤 같은 스크립트를 `parkick` 서비스 계정으로 실행해 실제 역할 자격증명을 검사합니다. 이 검사는 운영 모델을 한 번 호출하므로 준비되기 전에는 실행하지 않습니다.
+
+```bash
+cd /srv/parkick/app
+sudo -u parkick node --env-file=/etc/parkick/backend.env --import tsx backend/scripts/check-photo-validation.ts
+```
+
+합성 사과 한 장의 거부 성공만으로 킥보드·자전거 사진의 허용 품질이나 최종 접수 성공을 입증할 수 없습니다. 개인정보 없는 현장 시험 사진으로 사전 확인과 최종 제출을 별도로 검증해야 합니다. 기존 텍스트 연결 검사 CLI는 아래처럼 합성 문구를 Amazon 기본 모델에 보낼 뿐 **사진 판별용 Claude 추론 프로필은 검사하지 못합니다.** 이전 문서의 `amazon.nova-micro-v1:0`은 [이미지 입력을 지원하지 않는 텍스트 전용 모델](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-micro.html)이므로 사진 판별 모델 ID로 사용하면 안 됩니다.
 
 ```bash
 node --import tsx backend/scripts/check-bedrock.ts
 ```
 
-CLI는 실제 신고·개인정보 대신 고정된 합성 문구를 Amazon 기본 모델에 한 번 전송합니다. 최대 출력 16토큰·15초 제한·재시도 없음이며 소량의 모델 사용료가 발생할 수 있습니다. 성공 시 상태·토큰 사용량만 출력하고 자격증명·생성문은 출력하지 않습니다. 타사 모델·교차 리전 추론 프로파일은 검사하지 않습니다. [Converse API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html)에 필요한 권한은 `bedrock:InvokeModel`입니다. 향후 EC2 역할과 모델 권한이 준비되면 같은 서버 실행 환경에서 검증한 후 AI를 활성화합니다.
+기존 텍스트 CLI는 실제 신고·개인정보 대신 고정 합성 문구만 전송하며 최대 출력 16토큰·15초 제한·재시도 없이 소량의 모델 요금이 발생할 수 있습니다. [Converse API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html)의 IAM 권한 이름은 `bedrock:InvokeModel`입니다. 이 직접 호출 경로는 모델·역할 검증 전까지 비활성화하며 운영 사진 판별은 LiteLLM 프록시를 사용합니다.
 
 2026-10-16 18:17:54 KST 안내 문구까지 업체 선택으로 통일한 최종 릴리스 `20261016-operator-selection-2`를 배포했습니다. SHA-256 `675b4af4a03cf97fcac46efb0182ab7cdd7dbba87b2af7ff335db917613bbe5a`. 18:18:25 KST 실제 모바일 화면에서 최종 안내·카카오 실물 QR 자동 선택·수동 변경 확인을 통과했습니다. 기존 업체명 정리와 백업은 유지하며 추가 데이터 수정은 없었습니다.
 
 2026-10-16 **22:48:29 KST(13:48:29Z)** 관련 신고·QR 보완 릴리스 `20261016-related-qr-1`을 배포했습니다. 소스 SHA-256은 `6ca8ecb0194d82fd52ceb21b1b686c0826977a93eead87e8b2bbed2e0c5b2941`입니다. 같은 테넌트·지역·업체·기기번호의 미완료 신고를 현재 신고 기준 100m·전후 24시간 안에서 후보로 제시하고, 중간 완료 기록으로 새 사건을 구분합니다. 관리자가 직접 선택한 신고만 수거/견인 완료하며 각 접수번호와 개별 이력을 보존합니다. 빔 영문·숫자 QR, 빔 선택 후 5자리 숫자 입력, 지쿠 `08201`+6자리 번호와 사진 축소·명암 보정을 지원합니다. 수동 수정은 진행 중인 사진·카메라 판독과 해석 응답을 취소합니다.
+
+2026-10-18 **18:10 KST(09:10Z)** `20261018-auto-gps-qr-1`을 배포했습니다. 소스 SHA-256은 `537aa706d8768360721dc945bc5a8fd6e1a625756d53e59104c01c84f158b646`입니다. 위치 단계에서 사진 EXIF 대신 기기 GPS를 자동 요청하고 네이버 주소를 조회하며, 버튼으로 재확인할 수 있습니다. 스윙·알파카·쏘카 일레클의 확인된 QR 문자열도 해석합니다. 18:13 KST 실제 HTTPS 모바일 화면에서 개발용 안내 문구 제거, 모의 GPS 좌표 자동 표시, NAVER 도로명주소 반환, 새 QR 해석 API 3건을 확인했습니다. 신고 제출은 하지 않았고 기존 DB·사진·운영 환경파일을 유지했습니다.
+
+2026-10-19 **16:11 KST(07:11Z)** `20261019-demo-label-1`을 배포했습니다. 이전 릴리스를 복제해 변경된 관리자 목록 소스·Frontend 빌드·시연 seed만 교체했습니다. 시연용 기관과 지역의 DB 이름을 모두 `개발용 (시연 데이터)`로 바꾸고 목록에서는 같은 이름을 한 번만 표시합니다. 요청한 `PK-20261017-32396d122d0a`의 DB 신고·연결 행과 사진 1개·전용 디렉터리를 삭제했습니다. 접수번호와 내부 UUID·사진 경로를 대조한 후 처리했으며 DB·파일 부재와 다른 신고 4건 보존을 확인했습니다. Frontend 빌드·전체 린트, HTTPS 정적 파일 200, API health와 서비스 active를 확인했습니다. 스키마와 운영 환경파일은 변경하지 않았습니다.
+
+**과거 배포 기록:** 2026-10-21 **23:59 KST(14:59Z)** `20261021-qr-step-1`을 배포했습니다. 당시에는 QR 단계 체크박스 두 개를 제거하면서 기기번호를 선택 입력으로 바꿨고, 번호 없이 다음 단계로 가는 동작을 실사이트에서 확인했습니다. 2026-10-22 릴리스에서는 업체·기기번호를 모두 필수로 바꿨습니다. 당시 로컬 Frontend lint·빌드, 브라우저 검사를 수행했고 API health·서비스 active·JS 응답을 확인했습니다. 운영 신고 생성이나 사진 업로드는 하지 않았습니다.
 
 Backend 단위/API **127개**, 전용 PostgreSQL/API **14개**, 전체 브라우저 **39개**, 실제 DB 관리자 브라우저 **4개**를 통과했습니다. Frontend/Backend lint·타입 검사와 Frontend 빌드를 통과했습니다. 로컬 Backend 전체 빌드의 Prisma DLL 교체는 Windows 파일 잠금(EPERM)으로 실패했으나, EC2 새 폴더에서 `npm ci`·Prisma 생성·전체 운영 빌드·API·접수 준비 검사는 통과했습니다. **22:48:54 KST** 실제 사이트에서 사용자 빔 2장·지쿠·카카오 원본 사진, 기존 신고 6건의 관련 조회와 브라우저 합성 후보의 명시적 선택·확인창 취소를 확인했습니다. 실제 일괄 저장·충돌·재시도는 전용 로컬 DB에서 검증했습니다. 운영 신고 생성/완료·사진 업로드·QR 목적지 방문·브라우저 오류는 0회입니다. 이전 릴리스·DB·사진·공개 지도 설정을 보존했고 스키마 변경이나 업체명 추가 정리는 하지 않았습니다.

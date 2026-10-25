@@ -25,8 +25,11 @@ import { PrismaReportRepository } from './repositories/ReportRepository.js';
 import type { ReportRepository } from './repositories/ReportRepository.js';
 import { LocalEvidenceStorage } from './services/storage/LocalEvidenceStorage.js';
 import { S3EvidenceStorage } from './services/storage/S3EvidenceStorage.js';
+import { HybridEvidenceStorage } from './services/storage/HybridEvidenceStorage.js';
 import type { EvidenceStorage } from './services/storage/EvidenceStorage.js';
 import { ReportSubmissionService } from './services/reports/ReportSubmissionService.js';
+import { PhotoValidationService, type PhotoValidator } from './services/reports/PhotoValidationService.js';
+import type { LiteLlmSender } from './services/reports/LiteLlmPhotoClient.js';
 import { ReportLookupService } from './services/reports/ReportLookupService.js';
 import { PrismaReportLookupRepository } from './repositories/ReportLookupRepository.js';
 import type { ReportLookupRepository } from './repositories/ReportLookupRepository.js';
@@ -39,6 +42,8 @@ export interface AppOptions extends AIServiceOptions {
   reportLookupRepository?: ReportLookupRepository;
   adminAuthRepositories?: AdminAuthRepositories;
   adminReportRepository?: AdminReportRepository;
+  photoValidator?: PhotoValidator;
+  liteLlmSender?: LiteLlmSender;
 }
 
 export async function createApp(config: AppConfig, options: AppOptions = {}) {
@@ -61,19 +66,23 @@ export async function createApp(config: AppConfig, options: AppOptions = {}) {
   }));
   app.use(requireTrustedMutation(trustedOrigins));
   app.use(express.json({ limit: '16kb' }));
-  const generator = ReportTextGenerator.create(config, options);
+  // The old text endpoint is retained only for local compatibility. Production Bedrock is for evidence validation.
+  const generator = config.environment === 'production' ? new ReportTextGenerator(null) : ReportTextGenerator.create(config, options);
+  const photoValidator = options.photoValidator ?? PhotoValidationService.create(config, options.bedrockSender, options.timeoutMs, options.liteLlmSender);
   const repository = config.reports ? options.reportRepository ?? new PrismaReportRepository(config.reports.databaseUrl) : null;
   const lookupRepository = config.reports ? options.reportLookupRepository ?? new PrismaReportLookupRepository(config.reports.databaseUrl) : null;
   const lookupService = config.reports && lookupRepository ? new ReportLookupService(config.reports.lookupKey, lookupRepository) : null;
   const storageMode = config.reports?.storage?.mode ?? 'local';
   const storage: EvidenceStorage | null = config.reports ? options.reportStorage ?? (config.reports.storage?.mode === 's3'
-    ? new S3EvidenceStorage(config.reports.storage)
+    ? new HybridEvidenceStorage(new S3EvidenceStorage(config.reports.storage), config.reports.storage.prefix,
+      config.reports.legacyStorageDir ? new LocalEvidenceStorage(config.reports.legacyStorageDir) : null)
     : new LocalEvidenceStorage(config.reports.storageDir)) : null;
-  const reportService = config.reports && repository && storage ? new ReportSubmissionService(config.reports, repository, storage) : null;
+  const reportService = config.reports && repository && storage ? new ReportSubmissionService(config.reports, repository, storage, photoValidator) : null;
   app.get('/api/health', (_request, response) => {
     response.json({ data: {
       status: 'ok', phase: 5, mode: config.environment,
-      services: { database: repository ? 'configured' : 'not-connected', ai: generator.status().mode, storage: reportService ? `private-${storageMode}` : 'not-connected' },
+      services: { database: repository ? 'configured' : 'not-connected', ai: generator.status().mode,
+        photoValidation: photoValidator.mode, storage: reportService ? `private-${storageMode}` : 'not-connected' },
     } });
   });
   const authService = await AdminAuthService.create(config, options.adminAuthRepositories);
@@ -85,7 +94,7 @@ export async function createApp(config: AppConfig, options: AppOptions = {}) {
   app.use('/api/qr', qrRoutes(new QRController(new QRParsingService())));
   app.use('/api/ai', aiRoutes(new AIController(generator)));
   app.use('/api/reports/lookup', reportLookupRoutes(new ReportLookupController(lookupService)));
-  app.use('/api/reports', reportRoutes(new ReportController(reportService, storageMode)));
+  app.use('/api/reports', reportRoutes(new ReportController(reportService, photoValidator, storageMode)));
   app.use(notFound);
   app.use(errorHandler);
   return Object.assign(app, { closeResources: async () => {

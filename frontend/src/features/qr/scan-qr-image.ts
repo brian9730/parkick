@@ -33,6 +33,27 @@ export async function scanQrImage(Scanner: typeof QrScanner, file: File, isCurre
       const result = await attempt(canvas);
       if (result) return result;
     }
+    // A QR may occupy only a small part of a full vehicle photo. Keep its
+    // native detail in overlapping crops and try each orientation; damaged
+    // stickers can decode at a different rotation even when the library's
+    // whole-image scan fails.
+    const quarter = Math.min(width, height) / 4;
+    for (const y of [0.65, 0.5, 0.35]) {
+      for (const x of [0.5, 0.35, 0.65]) {
+        const cropX = (width - quarter) * x;
+        const cropY = (height - quarter) * y;
+        for (const angle of [0, 270, 90, 180]) {
+          canvas.width = canvas.height = 600;
+          context.save();
+          context.translate(300, 300);
+          context.rotate(angle * Math.PI / 180);
+          context.drawImage(image, cropX, cropY, quarter, quarter, -300, -300, 600, 600);
+          context.restore();
+          const result = await attempt(canvas);
+          if (result) return result;
+        }
+      }
+    }
     // Center first, then overlapping image regions; no vehicle-specific coordinates.
     const shorter = Math.min(width, height);
     const regions = [

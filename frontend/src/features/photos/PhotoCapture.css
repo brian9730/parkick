@@ -1,4 +1,9 @@
-.photo-capture { display: grid; gap: 14px; }
+.photo-capture { display: grid; gap: 8px; }
+.photo-guidance { border: 1px solid #e2e7ee; border-radius: 7px; background: #f8f9fb; color: #5d6877; padding: 9px 11px; font-size: 11px; line-height: 1.45; }
+.photo-guidance strong { display: block; color: #465362; font-size: 11px; font-weight: 700; }
+.photo-guidance ul { margin: 4px 0 0; padding-left: 14px; }
+.photo-guidance li + li { margin-top: 2px; }
+.photo-capture .photo-preview { min-height: 145px; padding: 18px 12px; gap: 8px; }
 .photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
 .photo-item { overflow: hidden; border: 1px solid #dbe5ef; border-radius: 10px; background: #fff; min-width: 0; }
 .photo-item > img { width: 100%; height: 160px; object-fit: cover; background: #fff; }
@@ -7,4 +12,4 @@
 .photo-item-actions { display: flex; flex-wrap: wrap; padding: 3px 4px 5px; }
 .photo-item-actions .button { flex: 1; min-height: 38px; padding: 8px 7px; font-size: 11px; gap: 5px; }
 .photo-capture > [role="status"] { display: flex; align-items: center; gap: 6px; }
-@media (max-width: 420px) { .photo-item > img { height: 125px; } .photo-item-actions .button { font-size: 10px; padding-inline: 4px; } }
+@media (max-width: 420px) { .photo-guidance { font-size: 10px; } .photo-capture .photo-preview { min-height: 112px; } .photo-item > img { height: 108px; } .photo-item-actions .button { font-size: 10px; padding-inline: 4px; } }

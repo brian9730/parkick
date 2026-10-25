@@ -10,6 +10,9 @@ const kakaoQr = 'https://t.kakao.com/launch?type=bike&ref=qrcode&id=ab1234';
 const beamQr = 'https://deeplink.ridebeam.com?code=7654321';
 const gcooQr = 'https://open.gbike.io/?b=1234567890';
 const gcooPrintedNumberQr = 'https://open.gbike.io/?b=08201654321';
+const swingQr = 'http://qrcode.theswing.co.kr/swingapp.page.link/CL5708';
+const alpacaQr = 'http://go-sbike.com/qc/index.do?code=424288';
+const elecleQr = 'https://matrix.elecle.bike/scan/qr?sn=10236234';
 
 function assertUnknown(rawQr: string, selectedOperatorId?: string): void {
   assert.deepEqual(new QRParsingService().parse(rawQr, selectedOperatorId), {
@@ -19,6 +22,35 @@ function assertUnknown(rawQr: string, selectedOperatorId?: string): void {
 }
 
 describe('Verified operator QR formats', () => {
+  it('recognizes the three supplied vehicle labels and canonical operator names', () => {
+    for (const [rawQr, operatorId, operatorName, deviceId, parserId] of [
+      [swingQr, 'swing', '스윙', 'CL5708', 'swing-qrcode-v1'],
+      [alpacaQr, 'alpaca', '알파카', '424288', 'alpaca-qc-v1'],
+      [elecleQr, 'elecle', '쏘카 일레클', '10236234', 'elecle-matrix-v1'],
+    ]) {
+      assert.deepEqual(new QRParsingService().parse(rawQr), {
+        rawQr, operatorId, operatorName, deviceId, parserId,
+        matched: true, source: 'registered-parser', reason: null,
+      });
+    }
+  });
+
+  it('does not accept altered hosts, paths, identifiers, or extra QR parameters', () => {
+    for (const valid of [swingQr, alpacaQr, elecleQr]) {
+      const url = new URL(valid);
+      for (const rawQr of [
+        valid.replace(url.hostname, `${url.hostname}.evil.test`),
+        valid.replace(url.hostname, url.hostname.toUpperCase()),
+        valid.replace(url.pathname, `${url.pathname}/other`),
+        `${valid}&extra=1`, `${valid}#fragment`, `${valid}\n`,
+        valid.replace('http:', 'https:'), valid.replace('https:', 'http:'),
+      ]) if (rawQr !== valid) assertUnknown(rawQr);
+    }
+    assertUnknown(swingQr.replace('CL5708', 'CL570'));
+    assertUnknown(alpacaQr.replace('424288', '42428'));
+    assertUnknown(elecleQr.replace('10236234', '1023623'));
+  });
+
   it('recognizes the verified Kakao family with reordered parameters and printable uppercase IDs', () => {
     for (const rawQr of [kakaoQr, 'https://t.kakao.com/launch?id=AB1234&type=bike&ref=qrcode']) {
       assert.deepEqual(new QRParsingService().parse(rawQr), {

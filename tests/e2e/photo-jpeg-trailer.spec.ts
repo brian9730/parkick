@@ -9,7 +9,6 @@ async function openPhotos(page: Page) {
   await page.getByRole('button', { name: 'QR을 확인하기 어려우신가요?' }).click();
   await page.getByLabel('운영업체', { exact: true }).selectOption('beam');
   await page.getByLabel('기기번호', { exact: true }).fill('PHOTO-JPEG');
-  await page.getByLabel('업체 및 기기 정보를 확인했습니다.').check();
   await page.getByRole('button', { name: '다음 단계', exact: true }).click();
 }
 

@@ -17,18 +17,20 @@ export const localCategories = [
   ['OTHER', '기타'],
 ] as const;
 
+const localDevelopmentName = '개발용 (시연 데이터)';
+
 /** Explicit demo ownership only; these names do not claim to represent an actual government. */
 export async function seedLocalDevelopment(client: PrismaClient): Promise<void> {
   await client.$transaction(async (transaction) => {
     const tenant = await transaction.tenant.upsert({
       where: { code: 'local-development' },
-      create: { code: 'local-development', name: '로컬 개발용 기관 (시연 데이터)' },
-      update: {},
+      create: { code: 'local-development', name: localDevelopmentName },
+      update: { name: localDevelopmentName },
     });
     const region = await transaction.region.upsert({
       where: { code: 'local-development' },
-      create: { code: 'local-development', name: '로컬 개발용 지역 (실제 관할 아님)', tenantId: tenant.id },
-      update: {},
+      create: { code: 'local-development', name: localDevelopmentName, tenantId: tenant.id },
+      update: { name: localDevelopmentName },
     });
     if (region.tenantId !== tenant.id) throw new Error('로컬 개발용 지역과 기관의 연결이 올바르지 않습니다.');
     for (const [sortOrder, [code, name]] of localCategories.entries()) {

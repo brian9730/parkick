@@ -32,7 +32,9 @@ export function requireTrustedMutation(trustedOrigins: ReadonlySet<string>): Req
     if (!origin || !trustedOrigins.has(origin)) {
       return next(new ApiError(403, 'UNTRUSTED_ORIGIN', '허용되지 않은 요청 출처입니다.'));
     }
-    const reportUpload = request.method === 'POST' && request.path === '/api/reports' && request.is('multipart/form-data');
+    const reportUpload = request.method === 'POST'
+      && ['/api/reports', '/api/reports/validate-photos'].includes(request.path)
+      && request.is('multipart/form-data');
     if (!reportUpload && !request.is('application/json')) {
       return next(new ApiError(415, 'JSON_REQUIRED', 'application/json 형식으로 요청해주세요.'));
     }

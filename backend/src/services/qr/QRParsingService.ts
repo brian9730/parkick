@@ -1,6 +1,9 @@
 import { GenericQRParser } from './GenericQRParser.js';
 import { BeamQRParser } from './BeamQRParser.js';
 import { GcooQRParser } from './GcooQRParser.js';
+import { SwingQRParser } from './SwingQRParser.js';
+import { AlpacaQRParser } from './AlpacaQRParser.js';
+import { ElecleQRParser } from './ElecleQRParser.js';
 import { KakaoBikeQRParser } from './KakaoBikeQRParser.js';
 import { OperatorMatcher } from './OperatorMatcher.js';
 import { getOperator } from '../../catalog/operators.js';
@@ -9,7 +12,10 @@ import type { ParsedQR } from './QRParser.js';
 export class QRParsingService {
   private readonly fallback = new GenericQRParser();
 
-  constructor(private readonly matcher = new OperatorMatcher([new KakaoBikeQRParser(), new BeamQRParser(), new GcooQRParser()])) {}
+  constructor(private readonly matcher = new OperatorMatcher([
+    new KakaoBikeQRParser(), new BeamQRParser(), new GcooQRParser(),
+    new SwingQRParser(), new AlpacaQRParser(), new ElecleQRParser(),
+  ])) {}
 
   parse(rawQr: string, selectedOperatorId?: string): ParsedQR {
     try {

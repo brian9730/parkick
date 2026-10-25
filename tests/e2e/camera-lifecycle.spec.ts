@@ -75,9 +75,9 @@ test('simulated camera: permission denial leaves the manual reporting route usab
   await expect(page.getByRole('alert')).toContainText('카메라 권한');
   expect(await trackStates(page)).toEqual([]);
   await page.getByRole('button', { name: 'QR을 확인하기 어려우신가요?' }).click();
-  await page.getByLabel('운영업체', { exact: true }).selectOption('unknown');
-  await page.getByLabel('기기번호 확인 불가', { exact: true }).check();
-  await page.getByLabel('업체 및 기기 정보를 확인했습니다.', { exact: true }).check();
+  await page.getByLabel('운영업체', { exact: true }).selectOption('other');
+  await page.getByLabel('기타 업체명', { exact: true }).fill('카메라 테스트 업체');
+  await page.getByLabel('기기번호', { exact: true }).fill('CAMERA-1');
   await page.getByRole('button', { name: '다음 단계', exact: true }).click();
   await expect(page.getByRole('heading', { level: 2 })).toHaveText('현장 사진을 등록해 주세요');
 });
@@ -97,9 +97,9 @@ test('simulated camera: repeated stop/start and leaving the QR step release only
   await page.waitForTimeout(450);
   expect(await trackStates(page)).toEqual(['ended', 'live']);
   await page.getByRole('button', { name: 'QR을 확인하기 어려우신가요?' }).click();
-  await page.getByLabel('운영업체', { exact: true }).selectOption('unknown');
-  await page.getByLabel('기기번호 확인 불가', { exact: true }).check();
-  await page.getByLabel('업체 및 기기 정보를 확인했습니다.', { exact: true }).check();
+  await page.getByLabel('운영업체', { exact: true }).selectOption('other');
+  await page.getByLabel('기타 업체명', { exact: true }).fill('카메라 테스트 업체');
+  await page.getByLabel('기기번호', { exact: true }).fill('CAMERA-2');
   await page.getByRole('button', { name: '다음 단계', exact: true }).click();
   await expect(page.getByRole('heading', { level: 2 })).toHaveText('현장 사진을 등록해 주세요');
   await expect.poll(() => trackStates(page)).toEqual(['ended', 'ended']);

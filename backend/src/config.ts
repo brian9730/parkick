@@ -11,10 +11,13 @@ const environmentSchema = z.object({
   DEV_ADMIN_EMAIL: z.string().default(''),
   DEV_ADMIN_PASSWORD: z.string().default(''),
   DEV_ADMIN_NAME: z.string().min(1).max(80).default('개발 관리자'),
-  AI_PROVIDER: z.preprocess(value => value === '' ? undefined : value, z.enum(['disabled', 'mock', 'bedrock']).optional()),
+  AI_PROVIDER: z.preprocess(value => value === '' ? undefined : value, z.enum(['disabled', 'mock', 'bedrock', 'litellm']).optional()),
   AWS_REGION: z.string().trim().max(100).default(''),
   BEDROCK_REGION: z.string().trim().max(100).default(''),
   BEDROCK_REPORT_MODEL_ID: z.string().trim().max(2048).default(''),
+  LLM_API_BASE_URL: z.string().trim().max(2048).default(''),
+  LLM_API_KEY: z.string().trim().default(''),
+  LLM_REPORT_MODEL_ID: z.string().trim().max(2048).default(''),
   DATABASE_URL: z.string().trim().default(''),
   REPORT_STORAGE_DIR: z.string().trim().default(''),
   REPORT_STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
@@ -25,11 +28,26 @@ const environmentSchema = z.object({
   PHONE_LOOKUP_HMAC_KEY: z.string().trim().default(''),
 });
 
-export type AIConfig = { mode: 'mock' | 'disabled' } | { mode: 'bedrock'; region: string; modelId: string };
+export type AIConfig = { mode: 'mock' | 'disabled' }
+  | { mode: 'bedrock'; region: string; modelId: string }
+  | { mode: 'litellm'; apiBaseUrl: string; apiKey: string; modelId: string };
+
+/** Accept only a HTTPS origin or its /v1 API base, never a path with URL credentials. */
+function liteLlmApiBaseUrl(value: string): string {
+  let url: URL;
+  try { url = new URL(value); }
+  catch { throw new Error('LLM_API_BASE_URL must be a HTTPS origin or /v1 API base.'); }
+  if (url.protocol !== 'https:' || !url.hostname || url.username || url.password || url.search || url.hash
+    || !['/', '/v1', '/v1/'].includes(url.pathname)) {
+    throw new Error('LLM_API_BASE_URL must be a HTTPS origin or /v1 API base.');
+  }
+  return `${url.origin}/v1`;
+}
 export type EvidenceStorageConfig = { mode: 'local' } | { mode: 's3'; region: string; bucket: string; prefix: string };
 export interface ReportConfig {
   databaseUrl: string;
   storageDir: string;
+  legacyStorageDir?: string;
   storage?: EvidenceStorageConfig;
   regionCode: string;
   encryptionKey: Buffer;
@@ -50,6 +68,9 @@ export interface AppConfig {
 
 /** Keep direct application construction subject to the same report storage boundaries. */
 export function assertProductionReportConfig(config: AppConfig): void {
+  if (config.reports?.legacyStorageDir !== undefined && !isAbsolute(config.reports.legacyStorageDir)) {
+    throw new Error('기존 신고 사진 저장에는 절대경로 REPORT_STORAGE_DIR이 필요합니다.');
+  }
   if (config.environment !== 'production') return;
   if (!config.reports) return;
   let origin: URL;
@@ -96,9 +117,17 @@ export function readConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
   if (aiMode === 'bedrock' && (!bedrockRegion || !env.BEDROCK_REPORT_MODEL_ID)) {
     throw new Error('Bedrock 사용에는 BEDROCK_REGION 또는 AWS_REGION과 BEDROCK_REPORT_MODEL_ID 설정이 필요합니다.');
   }
+  if (aiMode === 'litellm' && (!env.LLM_API_BASE_URL || !env.LLM_API_KEY || !env.LLM_REPORT_MODEL_ID)) {
+    throw new Error('LiteLLM requires LLM_API_BASE_URL, LLM_API_KEY, and LLM_REPORT_MODEL_ID.');
+  }
+  const apiBaseUrl = aiMode === 'litellm' ? liteLlmApiBaseUrl(env.LLM_API_BASE_URL) : null;
   let reports: ReportConfig | undefined;
   if (env.REPORT_STORAGE_PROVIDER === 's3' && (!env.DATABASE_URL || !env.AWS_REGION || !env.S3_REPORT_BUCKET)) {
     throw new Error('S3 신고 저장에는 DATABASE_URL, AWS_REGION, S3_REPORT_BUCKET 설정이 필요합니다.');
+  }
+  if (env.NODE_ENV === 'production' && env.REPORT_STORAGE_PROVIDER === 's3'
+    && env.REPORT_STORAGE_DIR && !isAbsolute(env.REPORT_STORAGE_DIR)) {
+    throw new Error('기존 신고 사진 저장에는 절대경로 REPORT_STORAGE_DIR이 필요합니다.');
   }
   if (env.DATABASE_URL) {
     if (env.NODE_ENV === 'production' && env.REPORT_STORAGE_PROVIDER === 'local'
@@ -123,6 +152,8 @@ export function readConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     if (encryptionKey.equals(lookupKey)) throw new Error('전화번호 암호화와 조회에는 서로 다른 키를 사용하세요.');
     reports = {
       databaseUrl: env.DATABASE_URL, storageDir: resolve(env.REPORT_STORAGE_DIR || 'data/reports'),
+      ...(env.REPORT_STORAGE_PROVIDER === 's3' && env.REPORT_STORAGE_DIR && isAbsolute(env.REPORT_STORAGE_DIR)
+        ? { legacyStorageDir: env.REPORT_STORAGE_DIR } : {}),
       storage: env.REPORT_STORAGE_PROVIDER === 's3'
         ? { mode: 's3', region: env.AWS_REGION, bucket: env.S3_REPORT_BUCKET, prefix: env.S3_REPORT_PREFIX }
         : { mode: 'local' },
@@ -143,7 +174,9 @@ export function readConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     sessionTtlMs: 8 * 60 * 60 * 1000,
     ai: aiMode === 'bedrock'
       ? { mode: aiMode, region: bedrockRegion, modelId: env.BEDROCK_REPORT_MODEL_ID }
-      : { mode: aiMode },
+      : aiMode === 'litellm'
+        ? { mode: aiMode, apiBaseUrl: apiBaseUrl!, apiKey: env.LLM_API_KEY, modelId: env.LLM_REPORT_MODEL_ID }
+        : { mode: aiMode },
     ...(reports ? { reports } : {}),
   };
   assertProductionReportConfig(config);

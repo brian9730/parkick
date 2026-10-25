@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import type { AdminOverviewService } from '../services/admin/AdminOverviewService.js';
-import { adminReportMapQuery, adminReportQuery, adminReportTransition, adminRelatedReportTransition } from '../services/admin/adminReportInput.js';
+import { adminNearbyReportQuery, adminReportMapQuery, adminReportQuery, adminReportTransition, adminRelatedReportTransition } from '../services/admin/adminReportInput.js';
 
 export class AdminOverviewController {
   constructor(private readonly service: AdminOverviewService) {}
@@ -17,6 +17,11 @@ export class AdminOverviewController {
   map: RequestHandler = async (request, response) => {
     const query = adminReportMapQuery.parse(request.query);
     response.json({ data: await this.service.getMap(response.locals.admin!, query) });
+  };
+
+  nearby: RequestHandler = async (request, response) => {
+    const query = adminNearbyReportQuery.parse(request.query);
+    response.json({ data: await this.service.getNearby(response.locals.admin!, query) });
   };
 
   detail: RequestHandler = async (request, response) => {

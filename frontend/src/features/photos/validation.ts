@@ -1,4 +1,4 @@
-export const MAX_PHOTOS = 3;
+export const MAX_PHOTOS = 2;
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 export const PHOTO_ACCEPT = '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp';
 

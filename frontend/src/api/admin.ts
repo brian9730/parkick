@@ -8,7 +8,7 @@ export interface Admin {
   tenantId?: string | null;
 }
 export interface Session { admin: Admin; mode: 'database' | 'development-mock' }
-export type AdminReportStatus = 'RECEIVED' | 'PROCESSING' | 'COMPLETED';
+export type AdminReportStatus = 'RECEIVED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
 export type AdminCompletionMethod = 'COLLECTED' | 'TOWED';
 export interface AdminReportSummary {
   publicId: string;
@@ -43,15 +43,18 @@ export interface AdminReportDetail extends AdminReportSummary {
 }
 export interface Dashboard {
   mode: 'database' | 'skeleton';
-  summary: { today: number | null; total: number | null; received: number | null; processing: number | null; completed: number | null };
+  summary: { today: number | null; total: number | null; received: number | null; processing: number | null; completed: number | null; rejected: number | null };
   recentReports: AdminReportSummary[];
 }
 export interface ReportList { mode: 'database' | 'skeleton'; items: AdminReportSummary[]; total: number; page: number; pageSize: number }
 export interface AdminMapReport extends AdminReportSummary { latitude: number; longitude: number }
 export interface ReportMapList { mode: 'database' | 'skeleton'; items: AdminMapReport[]; total: number; page: number; pageSize: number }
+export interface NearbyReport extends AdminMapReport { distanceMeters: number }
+export interface NearbyReportList { mode: 'database' | 'skeleton'; items: NearbyReport[]; total: number; page: number; pageSize: number }
+export interface NearbyReportFilters { latitude: number; longitude: number; page: number; pageSize: number }
 export interface ReportFilters { page: number; pageSize: number; status: AdminReportStatus | ''; q: string }
 export interface ReportStatusUpdate {
-  status: 'PROCESSING' | 'COMPLETED';
+  status: 'REJECTED' | 'COMPLETED';
   completionMethod?: AdminCompletionMethod;
   publicNote?: string;
   internalNote?: string;
@@ -60,7 +63,7 @@ export interface ReportStatusUpdate {
 export interface RelatedReports {
   anchorPublicId: string;
   eligible: boolean;
-  reason: 'ANCHOR_COMPLETED' | 'IDENTITY_UNKNOWN' | 'CANDIDATE_LIMIT' | null;
+  reason: 'ANCHOR_COMPLETED' | 'ANCHOR_REJECTED' | 'IDENTITY_UNKNOWN' | 'CANDIDATE_LIMIT' | null;
   criteria: { distanceMeters: number; timeWindowHours: number; maxSelection: number };
   items: (AdminReportSummary & { distanceMeters: number })[];
   truncated: boolean;
@@ -94,6 +97,13 @@ export const adminApi = {
     if (filters.status) query.set('status', filters.status);
     if (filters.q) query.set('q', filters.q);
     return apiRequest<ReportMapList>(`/admin/reports/map?${query}`, { signal });
+  },
+  nearbyReports: (filters: NearbyReportFilters, signal?: AbortSignal) => {
+    const query = new URLSearchParams({
+      latitude: String(filters.latitude), longitude: String(filters.longitude),
+      page: String(filters.page), pageSize: String(filters.pageSize),
+    });
+    return apiRequest<NearbyReportList>(`/admin/reports/nearby?${query}`, { signal });
   },
   report: (publicId: string, signal?: AbortSignal) => apiRequest<AdminReportDetail>(`/admin/reports/${encodeURIComponent(publicId)}`, { signal }),
   updateReport: (publicId: string, update: ReportStatusUpdate) => apiRequest<AdminReportDetail>(`/admin/reports/${encodeURIComponent(publicId)}/status`, { method: 'PATCH', body: JSON.stringify(update) }),

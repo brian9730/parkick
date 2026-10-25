@@ -70,13 +70,13 @@ it('production multipart intake uses S3 evidence, replays safely and removes onl
     assert.equal(repository.closed, true);
     assert.equal(storageClosed, true);
   });
-  assert.deepEqual((await request(app).get('/api/reports/status').expect(200)).body.data, { available: true, mode: 's3' });
+  assert.deepEqual((await request(app).get('/api/reports/status').expect(200)).body.data, { available: true, mode: 's3', photoValidation: 'disabled' });
   assert.equal((await request(app).get('/api/health').expect(200)).body.data.services.storage, 'private-s3');
   const photo = await sharp({ create: { width: 4, height: 3, channels: 3, background: '#12ab45' } }).png().toBuffer();
   const payload = {
     submissionId: randomUUID(), operator: '신고 테스트 업체', deviceId: 'TEST-S3', qrRawData: null,
     latitude: 37.5665, longitude: 126.9780, address: '테스트 공원', categories: ['보행로 통행 방해'],
-    additionalDescription: '', finalReportText: '통행을 방해하는 PM을 신고합니다.', phone: null, consent: false, reportConfirmed: true,
+    additionalDescription: '', phone: null, consent: false,
   };
   const submit = (input = payload) => request(app).post('/api/reports').set('Origin', origin)
     .field('report', JSON.stringify(input)).attach('photos', photo, { filename: 'private-source.png', contentType: 'image/png' });

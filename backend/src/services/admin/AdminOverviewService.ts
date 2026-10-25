@@ -3,7 +3,7 @@ import type { AdminReportRepository } from '../../repositories/AdminReportReposi
 import type { EvidenceStorage } from '../storage/EvidenceStorage.js';
 import type { AdminProfile } from '../../types/admin.js';
 import { ApiError } from '../../middleware/errors.js';
-import { reportScope, type AdminReportMapQuery, type AdminReportQuery, type AdminReportScope, type AdminReportTransition, type AdminRelatedReportTransition } from './adminReportInput.js';
+import { reportScope, type AdminNearbyReportQuery, type AdminReportMapQuery, type AdminReportQuery, type AdminReportScope, type AdminReportTransition, type AdminRelatedReportTransition } from './adminReportInput.js';
 
 export class AdminOverviewService {
   constructor(private readonly repository: AdminOverviewRepository, private readonly reports: AdminReportRepository | null = null, private readonly storage: EvidenceStorage | null = null) {}
@@ -21,6 +21,11 @@ export class AdminOverviewService {
   getMap(admin: AdminProfile, query: AdminReportMapQuery) {
     const scope = reportScope(admin);
     return scope ? this.run(repository => repository.map(scope, query)) : this.repository.getReports(query.page, query.pageSize);
+  }
+
+  getNearby(admin: AdminProfile, query: AdminNearbyReportQuery) {
+    const scope = reportScope(admin);
+    return scope ? this.run(repository => repository.nearby(scope, query)) : this.repository.getReports(query.page, query.pageSize);
   }
 
   detail(admin: AdminProfile, publicId: string) {

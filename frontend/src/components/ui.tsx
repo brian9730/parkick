@@ -19,7 +19,7 @@ export function FormField({ label, htmlFor, hint, children }: { label: string; h
 }
 
 export function PhaseNotice({ children, compact = false }: { children?: ReactNode; compact?: boolean }) {
-  return <div className={`phase-notice ${compact ? 'compact' : ''}`}><Info size={17} aria-hidden="true" /><div><strong>개발 미리보기</strong><span>{children || '개발용 서비스입니다. 지자체에 전달되거나 실제 민원으로 처리되지 않습니다.'}</span></div></div>;
+  return <div className={`phase-notice ${compact ? 'compact' : ''}`}><Info size={17} aria-hidden="true" /><div><strong>예시 화면</strong><span>{children}</span></div></div>;
 }
 
 export function EmptyState({ title, description, icon = <Inbox size={28} />, children }: { title: string; description: string; icon?: ReactNode; children?: ReactNode }) {

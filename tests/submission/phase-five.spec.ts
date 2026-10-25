@@ -1,27 +1,22 @@
-import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
 
 async function fillContactStep(page: Page) {
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: 0, longitude: 0 });
   await page.goto('/report');
   await page.getByRole('button', { name: 'QR을 확인하기 어려우신가요?' }).click();
-  await page.getByLabel('운영업체', { exact: true }).selectOption('unknown');
-  await page.getByLabel('기기번호 확인 불가', { exact: true }).check();
-  await page.getByLabel('업체 및 기기 정보를 확인했습니다.').check();
+  await page.getByLabel('운영업체', { exact: true }).selectOption('other');
+  await page.getByLabel('기타 업체명', { exact: true }).fill('브라우저 통합 검증 업체');
+  await page.getByLabel('기기번호', { exact: true }).fill('BROWSER-TEST-1');
   await page.getByRole('button', { name: '다음 단계', exact: true }).click();
   await page.getByLabel('갤러리 사진 선택', { exact: true }).setInputFiles(resolve('tests/fixtures/unknown-qr.png'));
   await expect(page.getByRole('img', { name: '첨부한 현장 사진 1' })).toBeVisible();
   await page.getByRole('button', { name: '다음 단계', exact: true }).click();
-  await page.getByText('위도·경도 직접 입력', { exact: true }).click();
-  await page.getByLabel('위도', { exact: true }).fill('0');
-  await page.getByLabel('경도', { exact: true }).fill('0');
-  await page.getByRole('button', { name: '입력한 좌표 적용' }).click();
+  await expect(page.getByRole('button', { name: '현재 위치 다시 확인', exact: true })).toBeVisible();
   await page.getByLabel('실제 신고할 위치임을 확인했습니다.').check();
   await page.getByRole('button', { name: '다음 단계', exact: true }).click();
   await page.getByRole('button', { name: '보행로 통행 방해', exact: true }).click();
-  await page.getByRole('button', { name: '다음 단계', exact: true }).click();
-  await page.getByLabel('신고 내용', { exact: true }).fill(`브라우저 통합 검증 ${randomUUID()}`);
-  await page.getByLabel('신고 내용을 확인했습니다.', { exact: true }).check();
   await page.getByRole('button', { name: '연락처 화면 보기' }).click();
   await expect(page.getByRole('button', { name: '신고 제출', exact: true })).toBeEnabled();
 }
@@ -40,7 +35,7 @@ test('a slow successful submission remains pending beyond one minute and reaches
   await page.getByRole('button', { name: '신고 제출', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page).toHaveURL(/\/report\/complete$/, { timeout: 75_000 });
-  await expect(page.getByRole('heading', { name: '개발용 신고가 접수됐어요' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '신고가 접수됐어요' })).toBeVisible();
   await expect(page.getByText('전화번호 없이 접수했어요', { exact: true })).toBeVisible();
 });
 

@@ -14,6 +14,7 @@ import { LocalEvidenceStorage, MAX_PHOTO_BYTES } from '../src/services/storage/L
 import { protectContact } from '../src/services/reports/phone.js';
 import { reportSubmissionSchema } from '../src/services/reports/reportInput.js';
 import { ReportSubmissionService } from '../src/services/reports/ReportSubmissionService.js';
+import type { PhotoValidator } from '../src/services/reports/PhotoValidationService.js';
 
 const origin = 'http://localhost:5173';
 const encryptionKey = randomBytes(32);
@@ -25,10 +26,10 @@ const environment = {
 const payload = (overrides: Record<string, unknown> = {}) => ({
   submissionId: randomUUID(), operator: '직접 확인한 업체', deviceId: 'DEVICE-TEST', qrRawData: '  raw-qr\n',
   latitude: 37.5665123, longitude: 126.9780123, address: '테스트 장소', categories: ['보행로 통행 방해'],
-  additionalDescription: '', finalReportText: '보행로에 놓인 PM으로 통행이 어렵습니다.', phone: null, consent: false,
-  reportConfirmed: true, ...overrides,
+  additionalDescription: '', phone: null, consent: false, ...overrides,
 });
 const photo = async () => ({ originalname: '현장.png', mimetype: 'image/png', buffer: await sharp({ create: { width: 4, height: 3, channels: 3, background: '#12ab45' } }).png().toBuffer() });
+const allowPhotos: PhotoValidator = { mode: 'mock', configured: true, async validate() {} };
 
 class MemoryRepository implements ReportRepository {
   readonly records = new Map<string, StoredReport>();
@@ -68,7 +69,7 @@ async function fixture(t: TestContext, overrides: NodeJS.ProcessEnv = {}) {
   const config = readConfig({ ...environment, REPORT_STORAGE_DIR: directory, ...overrides });
   const repository = new MemoryRepository();
   const storage = new LocalEvidenceStorage(directory);
-  const service = new ReportSubmissionService(config.reports!, repository, storage);
+  const service = new ReportSubmissionService(config.reports!, repository, storage, allowPhotos);
   return { directory, config, repository, storage, service };
 }
 
@@ -124,8 +125,8 @@ describe('Phase 4 local report configuration and contact privacy', () => {
       { phone: '01012345678', consent: false }, { phone: '0111234567', consent: true }, { phone: '0101234567', consent: true },
       { tenantId: randomUUID() }, { regionId: randomUUID() }, { status: 'COMPLETED' }, { adminId: randomUUID() },
       { aiGeneratedText: 'invented metadata' }, { reportConfirmed: false }, { categories: ['알 수 없는 유형'] },
-      { categories: ['기타'], additionalDescription: '  ' }, { categories: ['차도', '차도'] },
-      { latitude: 91 }, { longitude: -181 }, { finalReportText: '   ' }, { additionalDescription: 'x'.repeat(501) },
+      { categories: ['차도', '차도'] }, { latitude: 91 }, { longitude: -181 },
+      { finalReportText: '   ' }, { additionalDescription: 'x'.repeat(501) },
     ]) assert.equal(reportSubmissionSchema.safeParse(payload(change)).success, false);
     const result = reportSubmissionSchema.parse(payload());
     assert.equal(result.qrRawData, '  raw-qr\n');
@@ -188,6 +189,35 @@ describe('Phase 4 private photo handling', () => {
 });
 
 describe('Phase 4 submission idempotency and file cleanup', () => {
+  it('replays an old report with unknown operator/device but rejects a new report with missing identifiers', async t => {
+    const { config, service, repository, storage } = await fixture(t);
+    const input = payload({ operator: null, deviceId: null, finalReportText: '이전 신고문', reportConfirmed: true });
+    const files = [await photo()];
+    const parsed = reportSubmissionSchema.parse(input);
+    const photos = await storage.prepare(files);
+    const facts = {
+      submissionId: parsed.submissionId, operator: parsed.operator, deviceId: parsed.deviceId, qrRawData: parsed.qrRawData,
+      latitude: parsed.latitude, longitude: parsed.longitude, address: parsed.address,
+      categories: [...parsed.categories].sort(), additionalDescription: parsed.additionalDescription,
+      finalReportText: parsed.finalReportText!,
+    };
+    const submissionHash = createHmac('sha256', lookupKey).update('parkick-submission-v1\0')
+      .update(JSON.stringify({ facts, phoneIdentifier: null, photos: photos.map(photo => photo.sourceHash) })).digest('hex');
+    const receipt = { publicId: 'PK-20261001-aabbccddeeff', status: 'RECEIVED' as const,
+      createdAt: new Date().toISOString(), address: parsed.address,
+      latitude: parsed.latitude, longitude: parsed.longitude, hasContact: false };
+    repository.records.set(parsed.submissionId, { id: randomUUID(), submissionHash, receipt });
+    const unavailableValidator: PhotoValidator = {
+      mode: 'bedrock', configured: true,
+      async validate() { throw new Error('A replay must not call Bedrock.'); },
+    };
+    const replayService = new ReportSubmissionService(config.reports!, repository, storage, unavailableValidator);
+    assert.deepEqual(await replayService.submit(input, files), { receipt, replayed: true });
+    await assert.rejects(service.submit({ ...input, submissionId: randomUUID() }, files),
+      (error: unknown) => error instanceof ApiError && error.status === 400 && error.code === 'IDENTITY_REQUIRED');
+    assert.equal(repository.inputs.length, 0);
+  });
+
   it('stores one canonical operator name and replays code/name/alias submissions without another write', async t => {
     const { service, repository } = await fixture(t);
     const input = payload({ operator: 'kakao-bike' });
@@ -200,29 +230,30 @@ describe('Phase 4 submission idempotency and file cleanup', () => {
     }
     assert.equal(repository.inputs.length, 1);
     assert.equal(repository.inputs[0]!.facts.operator, '카카오 T 바이크');
-    assert.equal(repository.inputs[0]!.facts.finalReportText, input.finalReportText);
+    assert.equal(repository.inputs[0]!.facts.finalReportText, '신고 유형: 보행로 통행 방해');
     await assert.rejects(service.submit({ ...input, operator: 'beam' }, files), (error: unknown) => error instanceof ApiError && error.status === 409);
   });
 
-  it('accepts unchanged pre-normalization retries while rejecting changes to the report, operator or photos', async t => {
+  it('accepts unchanged legacy text and pre-normalization retries while rejecting changed report facts or photos', async t => {
     const { service, repository, storage } = await fixture(t);
     const input = payload({ operator: 'kakao-bike' });
+    const legacyInput = { ...input, finalReportText: '이전 화면에서 확인한 신고문', reportConfirmed: true };
     const files = [await photo()];
     const first = await service.submit(input, files);
     const saved = repository.inputs[0]!;
     const photos = await storage.prepare(files);
     const legacyHash = createHmac('sha256', lookupKey).update('parkick-submission-v1\0')
-      .update(JSON.stringify({ facts: { ...saved.facts, operator: 'kakao-bike' }, phoneIdentifier: null, photos: photos.map(photo => photo.sourceHash) })).digest('hex');
+      .update(JSON.stringify({ facts: { ...saved.facts, operator: 'kakao-bike', finalReportText: legacyInput.finalReportText }, phoneIdentifier: null, photos: photos.map(photo => photo.sourceHash) })).digest('hex');
     repository.records.get(saved.facts.submissionId)!.submissionHash = legacyHash;
-    const replay = await service.submit(input, files);
+    const replay = await service.submit(legacyInput, files);
     assert.equal(replay.replayed, true);
     assert.deepEqual(replay.receipt, first.receipt);
     assert.equal(repository.inputs.length, 1);
-    for (const patch of [{ operator: 'beam' }, { finalReportText: '수정된 신고문' }, { deviceId: 'CHANGED' }]) {
-      await assert.rejects(service.submit({ ...input, ...patch }, files), (error: unknown) => error instanceof ApiError && error.status === 409);
+    for (const patch of [{ operator: 'beam' }, { categories: ['차도'] }, { deviceId: 'CHANGED' }]) {
+      await assert.rejects(service.submit({ ...legacyInput, ...patch }, files), (error: unknown) => error instanceof ApiError && error.status === 409);
     }
     const changedPhoto = { ...files[0]!, buffer: await sharp(files[0]!.buffer).negate().png().toBuffer() };
-    await assert.rejects(service.submit(input, [changedPhoto]), (error: unknown) => error instanceof ApiError && error.status === 409);
+    await assert.rejects(service.submit(legacyInput, [changedPhoto]), (error: unknown) => error instanceof ApiError && error.status === 409);
   });
 
   it('saves a safe receipt and absent contact; returns the same receipt on retries and rejects changed payload', async t => {
@@ -240,7 +271,7 @@ describe('Phase 4 submission idempotency and file cleanup', () => {
     assert.deepEqual(Object.values(repository.inputs[0]!.contact), Array(7).fill(null));
     assert.equal(repository.inputs[0]!.regionCode, 'local-development');
     assert.equal(repository.inputs[0]!.facts.qrRawData, input.qrRawData);
-    await assert.rejects(service.submit({ ...input, finalReportText: '접수 후 변경된 내용' }, files), (error: unknown) => error instanceof ApiError && error.status === 409);
+    await assert.rejects(service.submit({ ...input, categories: ['차도'] }, files), (error: unknown) => error instanceof ApiError && error.status === 409);
     const changedPhoto = { ...files[0]!, buffer: await sharp(files[0]!.buffer).negate().png().toBuffer() };
     await assert.rejects(service.submit(input, [changedPhoto]), (error: unknown) => error instanceof ApiError && error.status === 409);
     assert.equal((await readdir(directory)).length, 1);
@@ -294,7 +325,52 @@ describe('Phase 4 submission idempotency and file cleanup', () => {
 });
 
 describe('Phase 4 report multipart API', () => {
-  it('accepts production local uploads as private files and cleans only a failed submission attempt', async t => {
+  it('checks photos before advancing, rejects unrelated evidence at both endpoints, and does not save rejected photos', async t => {
+    const { config, repository, directory } = await fixture(t);
+    let verdict: 'valid' | 'unrelated' | 'unavailable' = 'valid';
+    let calls = 0;
+    const photoValidator: PhotoValidator = {
+      mode: 'bedrock', configured: true,
+      async validate() {
+        calls += 1;
+        if (verdict === 'unrelated') throw new ApiError(422, 'PHOTO_NOT_PM', '올바른 현장 사진을 다시 첨부해주세요.');
+        if (verdict === 'unavailable') throw new ApiError(503, 'PHOTO_VALIDATION_UNAVAILABLE', '잠시 후 다시 시도해주세요.');
+      },
+    };
+    const app = await createApp(config, { reportRepository: repository, photoValidator });
+    t.after(() => app.closeResources());
+    const file = await photo();
+    const check = () => request(app).post('/api/reports/validate-photos').set('Origin', origin)
+      .attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype });
+    const submit = (body = payload()) => request(app).post('/api/reports').set('Origin', origin)
+      .field('report', JSON.stringify(body)).attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype });
+    assert.deepEqual((await check().expect(200)).body.data, { valid: true, photoValidation: 'bedrock' });
+    assert.deepEqual(await readdir(directory), [], 'A preflight photo check must not persist evidence');
+    await request(app).post('/api/reports/validate-photos').set('Origin', origin).field('report', '{}')
+      .attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype }).expect(400);
+    verdict = 'unrelated';
+    assert.equal((await check().expect(422)).body.error.code, 'PHOTO_NOT_PM');
+    assert.equal((await submit().expect(422)).body.error.code, 'PHOTO_NOT_PM');
+    assert.equal(repository.inputs.length, 0);
+    assert.deepEqual(await readdir(directory), []);
+    verdict = 'unavailable';
+    assert.equal((await check().expect(503)).body.error.code, 'PHOTO_VALIDATION_UNAVAILABLE');
+    assert.equal((await submit().expect(503)).body.error.code, 'PHOTO_VALIDATION_UNAVAILABLE');
+    verdict = 'valid';
+    for (const identity of [{ operator: null }, { operator: '   ' }, { operator: '업체 확인 불가' },
+      { deviceId: null }, { deviceId: '  ' }, { deviceId: '기기번호 확인 불가' }]) {
+      assert.equal((await submit(payload(identity)).expect(400)).body.error.code, 'IDENTITY_REQUIRED');
+    }
+    const input = payload();
+    const created = await submit(input).expect(201);
+    assert.equal(repository.inputs.length, 1);
+    const previousCalls = calls;
+    verdict = 'unavailable';
+    assert.deepEqual((await submit(input).expect(200)).body, created.body);
+    assert.equal(calls, previousCalls, 'An identical retry must not invoke Bedrock again');
+  });
+
+  it('keeps production intake available without Bedrock while validating image format and storing private files', async t => {
     const productionOrigin = 'https://parkick.example';
     const { config, repository, directory } = await fixture(t, {
       NODE_ENV: 'production', FRONTEND_ORIGIN: productionOrigin, REPORT_STORAGE_PROVIDER: 'local', TRUST_PROXY: 'loopback',
@@ -304,13 +380,26 @@ describe('Phase 4 report multipart API', () => {
     const health = await request(app).get('/api/health').expect(200);
     assert.equal(health.body.data.mode, 'production');
     assert.equal(health.body.data.services.storage, 'private-local');
-    assert.deepEqual((await request(app).get('/api/reports/status').expect(200)).body.data, { available: true, mode: 'local' });
+    assert.equal(health.body.data.services.photoValidation, 'disabled');
+    assert.deepEqual((await request(app).get('/api/reports/status').expect(200)).body.data, { available: true, mode: 'local', photoValidation: 'disabled' });
     const file = await photo();
+    assert.deepEqual((await request(app).post('/api/reports/validate-photos').set('Origin', productionOrigin)
+      .attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype }).expect(200)).body.data,
+    { valid: true, photoValidation: 'disabled' });
+    assert.deepEqual(await readdir(directory), [], 'A preflight format check must not persist evidence');
+    const invalidFile = Buffer.from('This is not an image');
+    const invalidCheck = await request(app).post('/api/reports/validate-photos').set('Origin', productionOrigin)
+      .attach('photos', invalidFile, { filename: 'invalid.png', contentType: 'image/png' }).expect(400);
+    assert.equal(invalidCheck.body.error.code, 'INVALID_PHOTO');
     const input = payload();
     const submit = (value = input, requestOrigin = productionOrigin) => request(app).post('/api/reports')
       .set('Origin', requestOrigin).field('report', JSON.stringify(value))
       .attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype });
     const created = await submit().expect(201);
+    const invalidSubmit = await request(app).post('/api/reports').set('Origin', productionOrigin)
+      .field('report', JSON.stringify(payload()))
+      .attach('photos', invalidFile, { filename: 'invalid.png', contentType: 'image/png' }).expect(400);
+    assert.equal(invalidSubmit.body.error.code, 'INVALID_PHOTO');
     assert.equal(created.body.data.status, 'RECEIVED');
     assert.deepEqual((await submit().expect(200)).body, created.body);
     assert.equal(repository.inputs.length, 1);
@@ -333,13 +422,13 @@ describe('Phase 4 report multipart API', () => {
   it('reports disabled/unavailable honestly and never exposes a storage path or DB error', async t => {
     const disabled = await createApp(readConfig({ NODE_ENV: 'test' }));
     const status = await request(disabled).get('/api/reports/status').expect(200);
-    assert.deepEqual(status.body.data, { available: false, mode: 'disabled' });
+    assert.deepEqual(status.body.data, { available: false, mode: 'disabled', photoValidation: 'mock' });
     await request(disabled).post('/api/reports').set('Origin', origin).send({}).expect(503);
     const { config, repository } = await fixture(t);
     repository.available = false;
-    const app = await createApp(config, { reportRepository: repository });
+    const app = await createApp(config, { reportRepository: repository, photoValidator: allowPhotos });
     t.after(() => app.closeResources());
-    assert.deepEqual((await request(app).get('/api/reports/status').expect(200)).body.data, { available: false, mode: 'local' });
+    assert.deepEqual((await request(app).get('/api/reports/status').expect(200)).body.data, { available: false, mode: 'local', photoValidation: 'mock' });
     repository.failure = 'read';
     const file = await photo();
     const failure = await request(app).post('/api/reports').set('Origin', origin).field('report', JSON.stringify(payload())).attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype }).expect(503);
@@ -350,17 +439,20 @@ describe('Phase 4 report multipart API', () => {
 
   it('accepts multipart photos, returns only a public receipt, and replays with HTTP 200', async t => {
     const { config, repository } = await fixture(t);
-    const app = await createApp(config, { reportRepository: repository });
+    const app = await createApp(config, { reportRepository: repository, photoValidator: allowPhotos });
     t.after(() => app.closeResources());
-    assert.deepEqual((await request(app).get('/api/reports/status').expect(200)).body.data, { available: true, mode: 'local' });
+    assert.deepEqual((await request(app).get('/api/reports/status').expect(200)).body.data, { available: true, mode: 'local', photoValidation: 'mock' });
     const file = await photo();
     const input = payload({ phone: '010-1234-5678', consent: true });
-    const submit = () => request(app).post('/api/reports').set('Origin', origin).field('report', JSON.stringify(input)).attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype });
+    const submit = () => request(app).post('/api/reports').set('Origin', origin).field('report', JSON.stringify(input))
+      .attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype })
+      .attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype });
     const created = await submit().expect(201);
     assert.deepEqual(Object.keys(created.body.data).sort(), ['address', 'createdAt', 'hasContact', 'latitude', 'longitude', 'publicId', 'status']);
     assert.equal(created.body.data.status, 'RECEIVED');
     assert.equal(created.body.data.hasContact, true);
     assert.deepEqual((await submit().expect(200)).body, created.body);
+    assert.equal(repository.inputs[0]!.images.length, 2);
     const objectKey = repository.inputs[0]!.images[0]!.objectKey;
     await request(app).get(`/api/reports/${objectKey}`).expect(404);
     await request(app).get(`/data/reports/${objectKey}`).expect(404);
@@ -368,7 +460,7 @@ describe('Phase 4 report multipart API', () => {
 
   it('validates payload, rejects forged ownership and preserves origin and JSON boundaries on other routes', async t => {
     const { config, repository } = await fixture(t);
-    const app = await createApp(config, { reportRepository: repository });
+    const app = await createApp(config, { reportRepository: repository, photoValidator: allowPhotos });
     t.after(() => app.closeResources());
     const file = await photo();
     const submit = (value: unknown) => request(app).post('/api/reports').set('Origin', origin).field('report', JSON.stringify(value)).attach('photos', file.buffer, { filename: file.originalname, contentType: file.mimetype });
@@ -388,12 +480,19 @@ describe('Phase 4 report multipart API', () => {
 
   it('limits total file count, binary size and report field size before persistence', async t => {
     const { config, repository } = await fixture(t);
-    const app = await createApp(config, { reportRepository: repository });
+    const app = await createApp(config, { reportRepository: repository, photoValidator: allowPhotos });
     t.after(() => app.closeResources());
     const file = await photo();
     let excessive = request(app).post('/api/reports').set('Origin', origin).field('report', JSON.stringify(payload()));
-    for (let index = 0; index < 4; index += 1) excessive = excessive.attach('photos', file.buffer, 'photo.png');
-    await excessive.expect(400);
+    for (let index = 0; index < 3; index += 1) excessive = excessive.attach('photos', file.buffer, 'photo.png');
+    const tooMany = await excessive.expect(400);
+    assert.equal(tooMany.body.error.code, 'INVALID_MULTIPART');
+    assert.match(tooMany.body.error.message, /1~2장/);
+    const tooManyPreflight = await request(app).post('/api/reports/validate-photos').set('Origin', origin)
+      .attach('photos', file.buffer, 'photo.png')
+      .attach('photos', file.buffer, 'photo.png')
+      .attach('photos', file.buffer, 'photo.png').expect(400);
+    assert.equal(tooManyPreflight.body.error.code, 'INVALID_MULTIPART');
     await request(app).post('/api/reports').set('Origin', origin).field('report', JSON.stringify(payload())).attach('photos', Buffer.alloc(MAX_PHOTO_BYTES + 1), 'photo.png').expect(413);
     await request(app).post('/api/reports').set('Origin', origin).field('report', 'x'.repeat(65537)).attach('photos', file.buffer, 'photo.png').expect(413);
     assert.equal(repository.inputs.length, 0);

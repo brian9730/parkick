@@ -19,26 +19,26 @@ function releaseCamera(session: CameraSession) {
   session.video.remove();
 }
 
-function cameraError(cause: unknown): string {
+function cameraError(cause: unknown, manualFallback: string): string {
   const name = cause instanceof DOMException ? cause.name : '';
   const message = cause instanceof Error ? cause.message : String(cause);
   if (name === 'NotAllowedError' || /permission|denied|notallowed/i.test(message)) {
-    return '카메라 사용이 허용되지 않았어요. 브라우저의 카메라 권한을 허용하거나 아래에서 직접 입력해 주세요.';
+    return `카메라 사용이 허용되지 않았어요. 브라우저의 카메라 권한을 허용하거나 ${manualFallback}`;
   }
   if (name === 'NotFoundError') {
-    return '사용 가능한 카메라가 없어요. QR 사진을 선택하거나 아래에서 직접 입력해 주세요.';
+    return `사용 가능한 카메라가 없어요. QR 사진을 선택하거나 ${manualFallback}`;
   }
   if (name === 'NotReadableError' || /notreadable|in use|could not start/i.test(message)) {
-    return '카메라를 사용할 수 없어요. 다른 앱의 카메라를 닫고 다시 시도하거나 직접 입력해 주세요.';
+    return `카메라를 사용할 수 없어요. 다른 앱의 카메라를 닫고 다시 시도하거나 ${manualFallback}`;
   }
   // qr-scanner collapses permission/device errors into "Camera not found."; do not claim the device is absent.
   if (/camera not found/i.test(message)) {
-    return '카메라를 시작하지 못했어요. 브라우저의 카메라 권한과 기기 연결을 확인하거나 아래에서 직접 입력해 주세요.';
+    return `카메라를 시작하지 못했어요. 브라우저의 카메라 권한과 기기 연결을 확인하거나 ${manualFallback}`;
   }
-  return '카메라를 시작하지 못했어요. QR 사진을 선택하거나 아래에서 직접 입력해 주세요.';
+  return `카메라를 시작하지 못했어요. QR 사진을 선택하거나 ${manualFallback}`;
 }
 
-export function QRScanner({ onDecoded, disabled = false }: { onDecoded: (rawQr: string) => void; disabled?: boolean }) {
+export function QRScanner({ onDecoded, disabled = false, compact = false, idleHint = 'QR을 읽기 어렵다면 아래 목록에서 업체를 선택하고 기기번호를 입력해 주세요.', manualFallback = '아래에서 직접 입력해 주세요.' }: { onDecoded: (rawQr: string) => void; disabled?: boolean; compact?: boolean; idleHint?: string; manualFallback?: string }) {
   const [state, setState] = useState<ScanState>('idle');
   const [error, setError] = useState<string | null>(null);
   const host = useRef<HTMLDivElement>(null);
@@ -69,12 +69,12 @@ export function QRScanner({ onDecoded, disabled = false }: { onDecoded: (rawQr: 
     release();
     setError(null);
     if (!window.isSecureContext) {
-      setError('카메라는 HTTPS 연결에서 사용할 수 있어요. QR 사진을 선택하거나 아래에서 직접 입력해 주세요.');
+      setError(`카메라는 HTTPS 연결에서 사용할 수 있어요. QR 사진을 선택하거나 ${manualFallback}`);
       setState('idle');
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      setError('이 브라우저는 카메라 촬영을 지원하지 않아요. QR 사진을 선택하거나 아래에서 직접 입력해 주세요.');
+      setError(`이 브라우저는 카메라 촬영을 지원하지 않아요. QR 사진을 선택하거나 ${manualFallback}`);
       setState('idle');
       return;
     }
@@ -110,7 +110,7 @@ export function QRScanner({ onDecoded, disabled = false }: { onDecoded: (rawQr: 
       release();
       createdVideo?.remove();
       setState('idle');
-      setError(cameraError(cause));
+      setError(cameraError(cause, manualFallback));
     }
   }
 
@@ -131,13 +131,14 @@ export function QRScanner({ onDecoded, disabled = false }: { onDecoded: (rawQr: 
     } catch (cause) {
       if (currentGeneration !== generation.current) return;
       setState('idle');
-      setError(cause instanceof Error ? cause.message : '사진에서 QR 코드를 찾지 못했어요. 선명한 QR 사진을 다시 선택하거나 직접 입력해 주세요.');
+      const message = cause instanceof Error ? cause.message : `사진에서 QR 코드를 찾지 못했어요. 선명한 QR 사진을 다시 선택하거나 ${manualFallback}`;
+      setError(manualFallback === '아래에서 직접 입력해 주세요.' ? message : message.replace('업체를 선택해 주세요.', manualFallback));
     }
   }
 
   const cameraRunning = state === 'starting' || state === 'scanning';
   const busy = state === 'starting' || state === 'image';
-  return <section className="qr-capture" aria-label="QR 코드 촬영">
+  return <section className={`qr-capture${compact && !cameraRunning && !busy ? ' is-compact' : ''}`} aria-label="QR 코드 촬영">
     <div className={`qr-live-frame ${cameraRunning ? 'is-active' : ''}`}>
       <div className="qr-video-stage" ref={host} />
       {cameraRunning ? <div className="qr-live-guide" aria-hidden="true" /> : <div className="qr-idle-content"><span className="scan-frame"><QrCode size={44} aria-hidden="true" /></span><strong>{state === 'decoded' ? 'QR 코드를 읽었어요' : '킥보드의 QR 코드를 비춰주세요'}</strong><p>기기에 붙어 있는 QR 코드를 촬영해 주세요.</p></div>}
@@ -149,7 +150,7 @@ export function QRScanner({ onDecoded, disabled = false }: { onDecoded: (rawQr: 
       event.currentTarget.value = '';
       if (file) void scanImage(file);
     }} />
-    <p className="field-hint" role="status">{state === 'scanning' ? 'QR 코드를 화면 중앙에 맞춰 주세요. 읽으면 카메라가 자동으로 꺼집니다.' : 'QR을 읽기 어렵다면 아래 목록에서 업체를 선택하고 기기번호를 입력해 주세요.'}</p>
+    <p className="field-hint" role="status">{state === 'scanning' ? 'QR 코드를 화면 중앙에 맞춰 주세요. 읽으면 카메라가 자동으로 꺼집니다.' : idleHint}</p>
     {error && <p className="inline-error" role="alert">{error}</p>}
   </section>;
 }

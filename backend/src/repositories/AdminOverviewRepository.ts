@@ -1,7 +1,7 @@
 /** Phase 1 contract only. No report data exists and zero must not imply measured statistics. */
 export interface DashboardSkeleton {
   mode: 'skeleton';
-  summary: { today: null; total: null; received: null; processing: null; completed: null };
+  summary: { today: null; total: null; received: null; processing: null; completed: null; rejected: null };
   recentReports: never[];
   byCategory: never[];
   byOperator: never[];
@@ -20,7 +20,7 @@ export class EmptyAdminOverviewRepository implements AdminOverviewRepository {
   async getDashboard(): Promise<DashboardSkeleton> {
     return {
       mode: 'skeleton',
-      summary: { today: null, total: null, received: null, processing: null, completed: null },
+      summary: { today: null, total: null, received: null, processing: null, completed: null, rejected: null },
       recentReports: [], byCategory: [], byOperator: [], byRegion: [], dailyTrend: [], mapMarkers: [],
     };
   }

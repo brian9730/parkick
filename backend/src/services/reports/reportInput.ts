@@ -16,17 +16,24 @@ export const reportSubmissionSchema = z.strictObject({
   address: optionalText(300),
   categories: z.array(z.enum(REPORT_CATEGORIES)).min(1).max(10).refine(values => new Set(values).size === values.length),
   additionalDescription: text(500),
-  finalReportText: text(2000).refine(value => value.length > 0),
+  // Accepted only so an already committed submission can be retried by an old client.
+  // New reports always use the server-generated summary below.
+  finalReportText: text(2000).min(1).optional(),
   phone: z.string().max(13).trim().nullable()
     .refine(value => !value || /^(?:010\d{8}|010-\d{4}-\d{4})$/.test(value))
     .transform(value => value ? value.replace(/-/g, '') : null),
   consent: z.boolean(),
-  reportConfirmed: z.literal(true),
-}).refine(value => !value.phone || value.consent, { path: ['consent'] })
-  .refine(value => !value.categories.includes('기타') || value.additionalDescription.length > 0, { path: ['additionalDescription'] });
+  reportConfirmed: z.literal(true).optional(),
+}).refine(value => !value.phone || value.consent, { path: ['consent'] });
 
 export type ReportSubmission = z.infer<typeof reportSubmissionSchema>;
-export type ReportFacts = Omit<ReportSubmission, 'phone' | 'consent' | 'reportConfirmed'>;
+export type ReportFacts = Omit<ReportSubmission, 'phone' | 'consent' | 'reportConfirmed' | 'finalReportText'> & { finalReportText: string };
+
+/** The category summary is separate from the optional description shown to administrators. */
+export function reportSummary(input: Pick<ReportSubmission, 'categories'>): string {
+  const category = [...input.categories].sort().join(', ');
+  return `신고 유형: ${category}`;
+}
 
 export interface ReportReceipt {
   publicId: string;

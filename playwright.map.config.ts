@@ -4,7 +4,7 @@ import { defineConfig } from '@playwright/test';
 // this intentionally invalid public key never contacts a real map account.
 export default defineConfig({
   testDir: './tests',
-  testMatch: 'map-feature.spec.ts',
+  testMatch: ['map-feature.spec.ts', 'collection-map.spec.ts'],
   outputDir: './test-results/map-feature',
   workers: 1,
   fullyParallel: false,

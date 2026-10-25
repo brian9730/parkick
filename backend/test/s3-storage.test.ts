@@ -73,6 +73,9 @@ describe('private S3 evidence storage', () => {
     const source = await photo();
     await assert.rejects(storage.prepare([{ ...source, buffer: source.buffer.subarray(0, 25) }]), (error: unknown) => error instanceof ApiError && error.status === 400);
     await assert.rejects(storage.save([]), (error: unknown) => error instanceof ApiError && error.status === 400);
+    const prepared = await storage.prepare([source, source]);
+    await assert.rejects(storage.save([...prepared, prepared[0]!]), (error: unknown) =>
+      error instanceof ApiError && error.status === 400 && error.code === 'INVALID_PHOTOS');
     await assert.rejects(storage.remove('../outside'), /Invalid evidence directory/);
     await assert.rejects(storage.remove('reports'), /Invalid evidence directory/);
     assert.equal(commands.length, 0);
@@ -85,7 +88,7 @@ describe('private S3 evidence storage', () => {
       return {};
     });
     const source = await photo();
-    const prepared = await storage.prepare([source, source, source]);
+    const prepared = await storage.prepare([source, source]);
     await assert.rejects(storage.save(prepared), (error: unknown) => {
       assert.ok(error instanceof ApiError);
       assert.equal(error.status, 503);
@@ -99,6 +102,16 @@ describe('private S3 evidence storage', () => {
     assert.ok(first instanceof PutObjectCommand && second instanceof PutObjectCommand && deletion instanceof DeleteObjectsCommand);
     const keys = deletion.input.Delete?.Objects?.map(object => object.Key);
     assert.deepEqual(keys, [first.input.Key, second.input.Key, first.input.Key!.replace('/1.jpg', '/3.jpg')]);
+  });
+
+  it('removes the third photo of a report saved before the two-photo limit', async () => {
+    const { storage, commands } = fixture();
+    const directory = randomUUID();
+    await storage.remove(directory);
+    const deletion = commands[0];
+    assert.ok(deletion instanceof DeleteObjectsCommand);
+    assert.deepEqual(deletion.input.Delete?.Objects?.map(object => object.Key),
+      [1, 2, 3].map(index => `reports/${directory}/${index}.jpg`));
   });
 
   it('bounds the upload attempt and cleans keys when a request is aborted', async () => {
@@ -138,6 +151,8 @@ describe('private S3 evidence storage', () => {
       assert.equal(url.hostname, 'parkick-test-evidence.s3.ap-northeast-2.amazonaws.com');
       assert.equal(url.pathname, `/${key}`);
       assert.equal(url.searchParams.get('X-Amz-Expires'), '120');
+      assert.equal(new URL(await storage.getReadUrl(key.replace('/1.jpg', '/3.jpg'), 120)).pathname,
+        `/${key.replace('/1.jpg', '/3.jpg')}`, 'Previously saved third photos remain readable');
       await assert.rejects(storage.getReadUrl(key, 301), /lifetime/);
       await assert.rejects(storage.getReadUrl(key, 0), /lifetime/);
       await assert.rejects(storage.getReadUrl(key.replace('reports/pilot', 'outside')), /object key/);

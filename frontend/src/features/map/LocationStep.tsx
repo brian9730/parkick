@@ -1,5 +1,5 @@
 import { LocateFixed, MapPin, RotateCcw } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Button, FormField } from '../../components/ui';
 import { NaverLocationMap } from './NaverLocationMap';
 import { getNaverAddress, loadNaverMaps, naverAuthErrorMessage, NaverMapsLoadError, subscribeNaverAuthFailure } from './naver';
@@ -17,6 +17,7 @@ export function LocationStep({ value, onChange }: {
   const clientId = (import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined)?.trim() || '';
   const [maps, setMaps] = useState<NaverMaps | null>(null);
   const [mapError, setMapError] = useState('');
+  const [mapRenderFailed, setMapRenderFailed] = useState(false);
   const [mapAttempt, setMapAttempt] = useState(0);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState('');
@@ -225,25 +226,30 @@ export function LocationStep({ value, onChange }: {
     setCoordinateRevision(previous => previous + 1);
   }
 
+  const autoInitialize = useEffectEvent(() => {
+    if (!latestValue.current) requestGps();
+  });
+
+  useEffect(() => {
+    // Defer until after mount; cleanup prevents duplicate requests in Strict Mode.
+    const timer = window.setTimeout(() => autoInitialize(), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return <div className="location-step">
     {maps && value ? <>
-      <NaverLocationMap maps={maps} latitude={value.latitude} longitude={value.longitude} onMove={(lat, lng) => selectCoordinates({ latitude: lat, longitude: lng, source: 'map' })} />
-      <p className="location-map-help">핀을 끌어 기기가 있는 위치로 옮겨 주세요. 위도·경도를 직접 입력해도 위치를 수정할 수 있어요.</p>
+      <NaverLocationMap maps={maps} latitude={value.latitude} longitude={value.longitude} onMove={(lat, lng) => selectCoordinates({ latitude: lat, longitude: lng, source: 'map' })} onError={() => setMapRenderFailed(true)} />
+      <p className="location-map-help">핀을 끌어 실제 신고 위치로 옮겨 주세요.</p>
     </> : <div className="location-unavailable">
       <MapPin size={30} aria-hidden="true" />
       <strong>{!clientId ? '지도 서비스 미연결' : mapError ? '지도를 불러오지 못했어요' : !maps ? '지도에 연결하고 있어요' : '먼저 신고 위치를 선택해 주세요'}</strong>
-      <p>{!clientId ? '현재 위치를 확인하거나 위도·경도를 직접 입력해 주세요. 지도와 주소 자동 조회는 아직 연결되지 않았어요.' : mapError || '현재 위치를 확인하거나 위도·경도를 입력하면 지도에서 핀을 움직일 수 있어요.'}</p>
+      <p>{!clientId ? '기기 위치를 자동으로 확인하거나 위도·경도를 직접 입력해 주세요. 지도와 주소 자동 조회는 아직 연결되지 않았어요.' : mapError || '기기 위치를 자동으로 확인해 표시해요. 위치를 확인할 수 없으면 직접 입력할 수 있어요.'}</p>
       {mapError && <Button variant="secondary" onClick={() => { setMapError(''); setMapAttempt(previous => previous + 1); }}><RotateCcw size={16} />지도 다시 연결</Button>}
     </div>}
-    <Button variant="secondary" className="full-width" onClick={requestGps} disabled={gpsLoading}><LocateFixed size={18} />{gpsLoading ? '현재 위치 확인 중…' : '현재 위치 확인'}</Button>
+    <Button variant="secondary" className="full-width" onClick={requestGps} disabled={gpsLoading}><LocateFixed size={18} />{gpsLoading ? '현재 위치 확인 중…' : value ? '현재 위치 다시 확인' : '현재 위치 확인'}</Button>
     {gpsLoading && <p className="field-hint" role="status">브라우저의 위치 권한을 허용해 주세요. 실내에서는 시간이 걸릴 수 있어요.</p>}
     {gpsError && <p className="location-error" role="alert">{gpsError}</p>}
-    {value && <div className="location-selected" role="status">
-      <strong>{value.source === 'gps' ? '현재 위치를 확인했어요' : value.source === 'map' ? '지도에서 위치를 수정했어요' : '직접 입력한 위치예요'}</strong>
-      <span>위도 {value.latitude.toFixed(6)} · 경도 {value.longitude.toFixed(6)}</span>
-      {value.source === 'gps' && value.accuracy !== undefined && <small>위치 정확도 약 {Math.round(value.accuracy)}m{value.accuracy > 100 ? ' · 오차가 커요. 실제 기기의 위치로 수정해 주세요.' : ''}</small>}
-    </div>}
-    <details className="location-manual" open={manualOpen} onToggle={event => setManualOpen(event.currentTarget.open)}>
+    {(gpsError || mapError || mapRenderFailed || !clientId) && <details className="location-manual" open={manualOpen} onToggle={event => setManualOpen(event.currentTarget.open)}>
       <summary>위도·경도 직접 입력</summary>
       <p className="field-hint">기기가 있는 실제 위치의 좌표를 입력한 뒤 적용해 주세요.</p>
       <div className="location-coordinate-fields">
@@ -252,11 +258,11 @@ export function LocationStep({ value, onChange }: {
       </div>
       <Button variant="secondary" className="full-width" onClick={applyCoordinates}>입력한 좌표 적용</Button>
       {coordinateError && <p className="location-error" id="location-coordinate-error" role="alert">{coordinateError}</p>}
-    </details>
-    <FormField label="주소 또는 위치 설명 (선택)" htmlFor="location-address" hint="주소를 수정해도 좌표는 바뀌지 않아요. 가까운 건물이나 도로명을 적으면 위치 확인에 도움이 돼요.">
-      <input id="location-address" value={value?.address || ''} maxLength={300} disabled={!value} placeholder={value ? '주소 또는 주변 건물·도로명 입력' : '먼저 현재 위치를 확인하거나 좌표를 적용해 주세요'} onChange={event => editAddress(event.target.value)} aria-describedby="location-address-hint" />
+    </details>}
+    <FormField label="주소 또는 위치 설명 (선택)" htmlFor="location-address">
+      <input id="location-address" value={value?.address || ''} maxLength={300} disabled={!value} placeholder={value ? '주소 또는 주변 건물·도로명 입력' : '먼저 현재 위치를 확인하거나 좌표를 적용해 주세요'} onChange={event => editAddress(event.target.value)} />
     </FormField>
-    {value && <p className={`location-address-status ${addressLookup === 'unavailable' ? 'is-error' : ''}`} role="status">
+    {value && (addressLookup === 'loading' || addressLookup === 'unavailable' || !maps) && <p className={`location-address-status ${addressLookup === 'unavailable' ? 'is-error' : ''}`} role="status">
       {addressLookup === 'loading' ? '선택한 좌표의 주소를 확인하고 있어요.'
         : addressLookup === 'found' ? '선택한 좌표의 주소를 지도 서비스에서 확인했어요.'
           : addressLookup === 'unavailable' ? '이 좌표의 주소를 찾지 못했어요. 좌표는 유지되며, 주소나 위치 설명을 직접 입력할 수 있어요.'

@@ -88,6 +88,7 @@ test('administrator finds a report, sees private evidence, collects it and publi
   await page.getByRole('button', { name: '검색', exact: true }).click();
   await page.getByRole('link').filter({ hasText: receipt.publicId }).click();
   await expect(page.getByRole('heading', { name: '신고 상세', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '견인 완료', exact: true })).toHaveCount(0);
   const detail = await page.request.get(`/api/admin/reports/${receipt.publicId}`);
   expect(detail.status()).toBe(200);
   const initial = (await detail.json()).data;
@@ -100,12 +101,6 @@ test('administrator finds a report, sees private evidence, collects it and publi
   expect(photo.headers()['cache-control']).toContain('no-store');
   expect((await request.get(photoUrl)).status()).toBe(401);
 
-  await page.getByLabel('공개 처리 메모', { exact: true }).fill(`${marker} 공개 처리중`);
-  await page.getByLabel('내부 메모', { exact: true }).fill(`${marker} 내부 처리중`);
-  await page.getByRole('button', { name: '처리중으로 변경', exact: true }).click();
-  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
-  await expect(page.getByText('처리중', { exact: true }).first()).toBeVisible();
-
   const publicNote = `${marker} 수거 완료 공개`;
   const internalNote = `${marker} 비공개 담당자 메모`;
   await page.getByLabel('공개 처리 메모', { exact: true }).fill(publicNote);
@@ -116,7 +111,7 @@ test('administrator finds a report, sees private evidence, collects it and publi
   const complete = (await (await page.request.get(`/api/admin/reports/${receipt.publicId}`)).json()).data;
   expect(complete.status).toBe('COMPLETED');
   expect(complete.completionMethod).toBe('COLLECTED');
-  expect(complete.history).toHaveLength(3);
+  expect(complete.history).toHaveLength(2);
   const publicResponse = await request.post(`/api/reports/lookup/${receipt.publicId}`, { headers: { Origin: origin }, data: { phone } });
   expect(publicResponse.status()).toBe(200);
   const publicResult = await publicResponse.json();
@@ -129,14 +124,62 @@ test('administrator finds a report, sees private evidence, collects it and publi
   await page.screenshot({ path: testInfo.outputPath('collected-detail-mobile.png'), fullPage: true });
 });
 
-test('administrator records direct towing completion and completed status remains immutable', async ({ page, request }) => {
+test('administrator rejects a legacy processing report and citizen lookup shows only the public reason', async ({ page, request }) => {
+  const receipt = await submit(request);
+  await login(page);
+  await expect(page.getByLabel('신고 핵심 현황')).toContainText('접수');
+  await expect(page.getByLabel('신고 핵심 현황')).toContainText('반려');
+  await expect(page.getByLabel('신고 핵심 현황')).not.toContainText('접수 대기');
+  const initial = (await (await page.request.get(`/api/admin/reports/${receipt.publicId}`)).json()).data;
+  const processing = await page.request.patch(`/api/admin/reports/${receipt.publicId}/status`, {
+    headers: { Origin: origin }, data: { status: 'PROCESSING', expectedUpdatedAt: initial.updatedAt },
+  });
+  expect(processing.status()).toBe(200);
+  await page.goto(`/admin/reports/${receipt.publicId}`);
+  await expect(page.getByRole('button', { name: '반려', exact: true })).toBeVisible();
+  const publicNote = `${marker} 신고 반려 사유`;
+  const internalNote = `${marker} 비공개 반려 메모`;
+  await page.getByLabel('공개 처리 메모', { exact: true }).fill(publicNote);
+  await page.getByLabel('내부 메모', { exact: true }).fill(internalNote);
+  await page.getByRole('button', { name: '반려', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '처리 상태 변경 확인' })).toContainText('저장 후에는 상태를 다시 변경할 수 없습니다.');
+  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  await expect(page.getByText('신고를 반려했습니다.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '반려', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '수거 완료', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: '같은 기기 신고 함께 처리' })).toHaveCount(0);
+
+  const detail = (await (await page.request.get(`/api/admin/reports/${receipt.publicId}`)).json()).data;
+  expect(detail.status).toBe('REJECTED');
+  expect(detail.completionMethod).toBeNull();
+  expect(detail.completedAt).toBeNull();
+  expect(detail.history).toHaveLength(3);
+  expect(detail.history[2].publicNote).toBe(publicNote);
+  expect(detail.history[2].internalNote).toBe(internalNote);
+  const publicResponse = await request.post(`/api/reports/lookup/${receipt.publicId}`, { headers: { Origin: origin }, data: { phone } });
+  expect(publicResponse.status()).toBe(200);
+  const publicResult = await publicResponse.json();
+  expect(publicResult.data.status).toBe('REJECTED');
+  expect(JSON.stringify(publicResult)).toContain(publicNote);
+  expect(JSON.stringify(publicResult)).not.toContain(internalNote);
+  expect(JSON.stringify(publicResult)).not.toContain('internalNote');
+  await page.goto('/report/status');
+  await page.getByLabel('휴대전화 번호', { exact: true }).fill(phone);
+  await page.getByRole('button', { name: '신고내역 조회', exact: true }).click();
+  await page.locator(`.lookup-report-card[href="/report/status/${receipt.publicId}"]`).click();
+  await expect(page.getByText(publicNote, { exact: true })).toBeVisible();
+  await expect(page.getByText('반려', { exact: true }).first()).toBeVisible();
+});
+
+test('historical towing completion remains readable and completed status remains immutable', async ({ page, request }) => {
   const receipt = await submit(request);
   await login(page);
   await page.goto(`/admin/reports/${receipt.publicId}`);
   const initial = (await (await page.request.get(`/api/admin/reports/${receipt.publicId}`)).json()).data;
-  await page.getByLabel('공개 처리 메모', { exact: true }).fill(`${marker} 견인 공개`);
-  await page.getByRole('button', { name: '견인 완료', exact: true }).click();
-  await page.getByRole('button', { name: '변경 확인', exact: true }).click();
+  await expect(page.getByRole('button', { name: '견인 완료', exact: true })).toHaveCount(0);
+  const legacy = await page.request.patch(`/api/admin/reports/${receipt.publicId}/status`, { headers: { Origin: origin }, data: { status: 'COMPLETED', completionMethod: 'TOWED', publicNote: `${marker} 견인 공개`, internalNote: '', expectedUpdatedAt: initial.updatedAt } });
+  expect(legacy.status()).toBe(200);
+  await page.reload();
   await expect(page.getByText('견인 완료', { exact: true }).first()).toBeVisible();
   const detail = (await (await page.request.get(`/api/admin/reports/${receipt.publicId}`)).json()).data;
   expect(detail.history).toHaveLength(2);
@@ -162,6 +205,7 @@ test('administrator explicitly selects related reports and completes only those 
   await expect(panel.getByRole('checkbox').nth(0)).not.toBeChecked();
   await expect(panel.getByRole('checkbox').nth(1)).not.toBeChecked();
   await expect(panel.getByRole('button', { name: '선택 신고 함께 수거 완료', exact: true })).toBeDisabled();
+  await expect(panel.getByRole('button', { name: '선택 신고 함께 견인 완료', exact: true })).toHaveCount(0);
   await expect(panel.getByRole('link', { name: `${selected.publicId} 신고 상세 새 창에서 보기`, exact: true })).toHaveAttribute('target', '_blank');
   await panel.getByRole('checkbox', { name: `${selected.publicId} 함께 처리 선택`, exact: true }).check();
   await expect(panel.getByText('추가 신고 1건 선택 · 현재 신고 포함 2건', { exact: true })).toBeVisible();
@@ -226,12 +270,12 @@ test('stale related report aborts the whole completion and requires fresh explic
   });
   expect(concurrentUpdate.status()).toBe(200);
 
-  await panel.getByRole('button', { name: '선택 신고 함께 견인 완료', exact: true }).click();
+  await panel.getByRole('button', { name: '선택 신고 함께 수거 완료', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: '2건 완료 확인', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('신고 상태 또는 함께 처리할 수 있는 조건이 변경되어 저장하지 않았습니다.');
   await expect(checkbox).not.toBeChecked();
   await expect(checkbox).toBeDisabled();
-  await expect(panel.getByRole('button', { name: '선택 신고 함께 견인 완료', exact: true })).toBeDisabled();
+  await expect(panel.getByRole('button', { name: '선택 신고 함께 수거 완료', exact: true })).toBeDisabled();
   const unchangedAnchor = (await (await page.request.get(`/api/admin/reports/${anchor.publicId}`)).json()).data;
   const unchangedCandidate = (await (await page.request.get(`/api/admin/reports/${candidate.publicId}`)).json()).data;
   expect(unchangedAnchor.status).toBe('RECEIVED');
@@ -243,13 +287,13 @@ test('stale related report aborts the whole completion and requires fresh explic
   await expect(checkbox).toBeEnabled();
   await expect(checkbox).not.toBeChecked();
   await checkbox.check();
-  await panel.getByRole('button', { name: '선택 신고 함께 견인 완료', exact: true }).click();
+  await panel.getByRole('button', { name: '선택 신고 함께 수거 완료', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: '2건 완료 확인', exact: true }).click();
-  await expect(page.getByText('신고 2건을 견인 완료로 저장했습니다. 각 신고의 접수번호와 내역은 유지됩니다.', { exact: true })).toBeVisible();
+  await expect(page.getByText('신고 2건을 수거 완료로 저장했습니다. 각 신고의 접수번호와 내역은 유지됩니다.', { exact: true })).toBeVisible();
   for (const item of [anchor, candidate]) {
     const detail = (await (await page.request.get(`/api/admin/reports/${item.publicId}`)).json()).data;
     expect(detail.status).toBe('COMPLETED');
-    expect(detail.completionMethod).toBe('TOWED');
+    expect(detail.completionMethod).toBe('COLLECTED');
     expect(detail.history).toHaveLength(item === anchor ? 2 : 3);
   }
 });

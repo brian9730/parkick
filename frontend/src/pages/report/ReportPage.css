@@ -1,0 +1,38 @@
+@media (max-width: 600px) {
+  main:has(.flow-page) + .public-footer { display: none; }
+  .flow-page:has(.wizard-card) { padding-bottom: 0; }
+  .flow-outro,
+  .wizard-bottom-note { display: none; }
+  .wizard-card:has(.location-wizard-content) { padding-top: 17px; }
+  .location-wizard-content { margin-top: 13px; }
+  .location-wizard-content .location-confirmation { margin-top: 8px; padding-top: 8px; line-height: 1.4; }
+  .location-wizard-content ~ .wizard-actions { margin-top: 14px; }
+}
+
+@media (max-width: 600px) and (max-height: 700px) {
+  .flow-page:has(.location-wizard-content) { padding-top: 8px; }
+  .flow-page:has(.location-wizard-content) .back-link { padding-block: 2px; }
+  .flow-page:has(.location-wizard-content) .step-indicator { padding-block: 8px; }
+  .flow-page:has(.location-wizard-content) .step-indicator li { gap: 3px; }
+  .wizard-card:has(.location-wizard-content) { padding-top: 10px; }
+  .wizard-card:has(.location-wizard-content) .wizard-heading p { display: none; }
+  .location-wizard-content { margin-top: 8px; }
+  .location-wizard-content .location-step { gap: 5px; }
+  .location-wizard-content .location-live-map { height: 130px; }
+  .location-wizard-content .location-map-help { display: none; }
+  .location-wizard-content .location-confirmation { margin-top: 5px; padding-top: 5px; }
+  .location-wizard-content ~ .wizard-actions { margin-top: 8px; }
+
+  .flow-page:has(.category-step) { padding-top: 8px; }
+  .flow-page:has(.category-step) .back-link { padding-block: 2px; }
+  .flow-page:has(.category-step) .step-indicator { padding-block: 8px; }
+  .flow-page:has(.category-step) .step-indicator li { gap: 3px; }
+  .wizard-card:has(.category-step) { padding-top: 10px; }
+  .wizard-card:has(.category-step) .wizard-heading p { display: none; }
+  .category-step { margin-top: 8px; }
+  .category-step > .field-hint { display: none; }
+  .category-step .category-grid { margin-top: 0; }
+  .category-step .form-field { margin-top: 6px; }
+  .category-step textarea { height: 44px; min-height: 44px; }
+  .category-step ~ .wizard-actions { margin-top: 8px; }
+}

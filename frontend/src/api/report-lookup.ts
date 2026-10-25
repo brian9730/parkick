@@ -1,6 +1,6 @@
 import { ApiError, apiRequest } from './client';
 
-export type PublicReportStatus = 'RECEIVED' | 'PROCESSING' | 'COMPLETED';
+export type PublicReportStatus = 'RECEIVED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
 export type PublicCompletionMethod = 'COLLECTED' | 'TOWED' | null;
 export interface PublicReportSummary {
   publicId: string;
@@ -27,7 +27,7 @@ export interface PublicReportDetail extends PublicReportSummary { history: Publi
 
 const invalidResponse = () => new ApiError('조회 결과를 확인하지 못했어요. 잠시 후 다시 조회해 주세요.', 0, 'INVALID_RESPONSE');
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
-const isStatus = (value: unknown): value is PublicReportStatus => value === 'RECEIVED' || value === 'PROCESSING' || value === 'COMPLETED';
+const isStatus = (value: unknown): value is PublicReportStatus => value === 'RECEIVED' || value === 'PROCESSING' || value === 'COMPLETED' || value === 'REJECTED';
 const isCompletionMethod = (value: unknown): value is PublicCompletionMethod => value === null || value === 'COLLECTED' || value === 'TOWED';
 const isDate = (value: unknown): value is string => typeof value === 'string' && value.length <= 40 && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value));
 

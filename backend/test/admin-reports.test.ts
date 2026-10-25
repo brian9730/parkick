@@ -10,7 +10,7 @@ import { ApiError } from '../src/middleware/errors.js';
 import { EmptyAdminOverviewRepository } from '../src/repositories/AdminOverviewRepository.js';
 import { PrismaAdminReportRepository } from '../src/repositories/AdminReportRepository.js';
 import { AdminOverviewService } from '../src/services/admin/AdminOverviewService.js';
-import { adminReportMapQuery, adminReportQuery, adminReportTransition, reportScope } from '../src/services/admin/adminReportInput.js';
+import { adminNearbyReportQuery, adminReportMapQuery, adminReportQuery, adminReportTransition, reportScope } from '../src/services/admin/adminReportInput.js';
 import { LocalEvidenceStorage } from '../src/services/storage/LocalEvidenceStorage.js';
 
 const input = { status: 'PROCESSING', expectedUpdatedAt: new Date().toISOString() };
@@ -70,6 +70,20 @@ describe('Administrator report validation and private local photo reads', () => 
     }
   });
 
+  it('requires finite nearby coordinates, bounded pages, and no caller-supplied tenant scope', () => {
+    assert.deepEqual(adminNearbyReportQuery.parse({ latitude: '37.123456', longitude: '127.123456' }),
+      { latitude: 37.123456, longitude: 127.123456, page: 1, pageSize: 200 });
+    for (const query of [{ longitude: '127' }, { latitude: '37' }, { latitude: '', longitude: '127' },
+      { latitude: 'NaN', longitude: '127' }, { latitude: 'Infinity', longitude: '127' },
+      { latitude: '91', longitude: '127' }, { latitude: '37', longitude: '-181' },
+      { latitude: '37', longitude: '127', tenantId: randomUUID() },
+      { latitude: '37', longitude: '127', status: 'COMPLETED' },
+      { latitude: '37', longitude: '127', pageSize: 501 },
+      { latitude: '37', longitude: '127', page: 0 }]) {
+      assert.equal(adminNearbyReportQuery.safeParse(query).success, false);
+    }
+  });
+
   it('bounds pagination, search and notes and requires a method only for completion', () => {
     assert.deepEqual(adminReportQuery.parse({}), { page: 1, pageSize: 20, q: '' });
     assert.equal(adminReportQuery.parse({ q: '  기기  ' }).q, '기기');
@@ -78,7 +92,10 @@ describe('Administrator report validation and private local photo reads', () => 
     }
     assert.equal(adminReportTransition.parse({ ...input, publicNote: '  확인 중  ' }).publicNote, '확인 중');
     assert.equal(adminReportTransition.safeParse({ ...input, status: 'COMPLETED', completionMethod: 'TOWED' }).success, true);
+    assert.equal(adminReportTransition.safeParse({ ...input, status: 'REJECTED', publicNote: '신고 대상 아님' }).success, true);
+    assert.equal(adminReportQuery.parse({ status: 'REJECTED' }).status, 'REJECTED');
     for (const change of [{ ...input, status: 'RECEIVED' }, { ...input, status: 'COMPLETED' }, { ...input, completionMethod: 'COLLECTED' },
+      { ...input, status: 'REJECTED', completionMethod: 'COLLECTED' },
       { ...input, expectedUpdatedAt: 'today' }, { ...input, internalNote: 'x'.repeat(1001) }, { ...input, publicNote: 'x'.repeat(1001) }, { ...input, adminId: randomUUID() }, { ...input, publicNote: '\0' }, { ...input, internalNote: '\0' }]) {
       assert.equal(adminReportTransition.safeParse(change).success, false);
     }
@@ -90,6 +107,8 @@ describe('Administrator report validation and private local photo reads', () => 
     assert.equal((await service.getDashboard(mock)).mode, 'skeleton');
     assert.equal((await service.getReports(mock, adminReportQuery.parse({}))).mode, 'skeleton');
     assert.deepEqual(await service.getMap(mock, adminReportMapQuery.parse({})), { mode: 'skeleton', items: [], total: 0, page: 1, pageSize: 200 });
+    assert.deepEqual(await service.getNearby(mock, adminNearbyReportQuery.parse({ latitude: 37, longitude: 127 })),
+      { mode: 'skeleton', items: [], total: 0, page: 1, pageSize: 200 });
     assert.throws(() => service.detail(mock, 'unknown'), apiError(501));
     await assert.rejects(service.image(mock, 'unknown', randomUUID()), apiError(501));
     assert.throws(() => reportScope({ ...mock, role: 'TENANT_ADMIN', tenantId: null }), apiError(403));
@@ -98,6 +117,8 @@ describe('Administrator report validation and private local photo reads', () => 
       await assert.rejects(repository.list({ adminId: mock.id, role: 'TENANT_ADMIN', tenantId: null }, adminReportQuery.parse({})), apiError(403));
       await assert.rejects(repository.detail({ adminId: mock.id, role: 'PLATFORM_ADMIN', tenantId: randomUUID() }, 'unknown'), apiError(403));
       await assert.rejects(repository.map({ adminId: mock.id, role: 'TENANT_ADMIN', tenantId: null }, adminReportMapQuery.parse({})), apiError(403));
+      await assert.rejects(repository.nearby({ adminId: mock.id, role: 'TENANT_ADMIN', tenantId: null },
+        adminNearbyReportQuery.parse({ latitude: 37, longitude: 127 })), apiError(403));
     } finally { await repository.close(); }
   });
 

@@ -1,12 +1,19 @@
 import type { RequestHandler } from 'express';
 import { ApiError } from '../middleware/errors.js';
 import type { ReportSubmissionService } from '../services/reports/ReportSubmissionService.js';
+import type { PhotoValidator } from '../services/reports/PhotoValidationService.js';
+import { prepareEvidence } from '../services/storage/prepareEvidence.js';
 
 export class ReportController {
-  constructor(private readonly service: ReportSubmissionService | null, private readonly mode: 'local' | 's3' = 'local') {}
+  constructor(private readonly service: ReportSubmissionService | null,
+    private readonly photoValidator: PhotoValidator, private readonly mode: 'local' | 's3' = 'local') {}
 
   status: RequestHandler = async (_request, response) => {
-    response.json({ data: { available: await this.service?.isAvailable() ?? false, mode: this.service ? this.mode : 'disabled' } });
+    response.json({ data: {
+      available: await this.service?.isAvailable() ?? false,
+      mode: this.service ? this.mode : 'disabled',
+      photoValidation: this.photoValidator.mode,
+    } });
   };
 
   requireAvailable: RequestHandler = (_request, _response, next) => {
@@ -25,5 +32,14 @@ export class ReportController {
     const files = Array.isArray(request.files) ? request.files : [];
     const result = await this.service.submit(input, files);
     if (!response.destroyed) response.status(result.replayed ? 200 : 201).json({ data: result.receipt });
+  };
+
+  validatePhotos: RequestHandler = async (request, response) => {
+    if (!request.body || typeof request.body !== 'object' || Object.keys(request.body).length !== 0) {
+      throw new ApiError(400, 'INVALID_INPUT', '사진만 첨부해주세요.');
+    }
+    const prepared = await prepareEvidence(Array.isArray(request.files) ? request.files : []);
+    await this.photoValidator.validate(prepared);
+    response.json({ data: { valid: true, photoValidation: this.photoValidator.mode } });
   };
 }

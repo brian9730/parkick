@@ -19,7 +19,7 @@ export interface PublicReportSummary {
   createdAt: string;
   operatorName: string | null;
   categories: string[];
-  status: 'RECEIVED' | 'PROCESSING' | 'COMPLETED';
+  status: 'RECEIVED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
   completionMethod: 'COLLECTED' | 'TOWED' | null;
   completedAt: string | null;
 }

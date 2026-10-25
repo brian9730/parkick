@@ -10,27 +10,22 @@ const db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 test.afterAll(async () => { await db.$disconnect(); });
 
 async function fillReport(page: Page, expectEnabled = true, knownOperator?: string, evidence: string | { name: string; mimeType: string; buffer: Buffer } = photo) {
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: 37.2636, longitude: 127.0286 });
   await page.goto('/report');
   await page.getByRole('button', { name: 'QR을 확인하기 어려우신가요?' }).click();
   await page.getByLabel('운영업체', { exact: true }).selectOption(knownOperator ?? 'other');
   if (!knownOperator) await page.getByLabel('기타 업체명', { exact: true }).fill('접수 테스트 업체');
   await page.getByLabel('기기번호', { exact: true }).fill('LOCAL-PHASE4');
-  await page.getByLabel('업체 및 기기 정보를 확인했습니다.').check();
   await page.getByRole('button', { name: '다음 단계', exact: true }).click();
   await page.getByLabel('갤러리 사진 선택', { exact: true }).setInputFiles(evidence);
   await expect(page.getByRole('img', { name: '첨부한 현장 사진 1' })).toBeVisible();
   await page.getByRole('button', { name: '다음 단계', exact: true }).click();
-  await page.getByText('위도·경도 직접 입력', { exact: true }).click();
-  await page.getByLabel('위도', { exact: true }).fill('37.2636');
-  await page.getByLabel('경도', { exact: true }).fill('127.0286');
-  await page.getByRole('button', { name: '입력한 좌표 적용' }).click();
+  await expect(page.getByRole('button', { name: '현재 위치 다시 확인', exact: true })).toBeVisible();
   await page.getByLabel('주소 또는 위치 설명 (선택)').fill('테스트 공원 출입구');
   await page.getByLabel('실제 신고할 위치임을 확인했습니다.').check();
   await page.getByRole('button', { name: '다음 단계', exact: true }).click();
   await page.getByRole('button', { name: '보행로 통행 방해', exact: true }).click();
-  await page.getByRole('button', { name: '다음 단계', exact: true }).click();
-  await page.getByLabel('신고 내용', { exact: true }).fill('현장에서 확인한 주차 상황을 신고합니다.');
-  await page.getByLabel('신고 내용을 확인했습니다.', { exact: true }).check();
   await page.getByRole('button', { name: '연락처 화면 보기' }).click();
   if (expectEnabled) await expect(page.getByRole('button', { name: '신고 제출', exact: true })).toBeEnabled();
 }
@@ -50,7 +45,7 @@ test('anonymous submission persists to PostgreSQL and private files, and receipt
   expect(receipt.publicId).toMatch(/^PK-/);
   expect(Object.keys(receipt).sort()).toEqual(['address', 'createdAt', 'hasContact', 'latitude', 'longitude', 'publicId', 'status']);
   await expect(page).toHaveURL(/\/report\/complete$/);
-  await expect(page.getByRole('heading', { name: '개발용 신고가 접수됐어요' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '신고가 접수됐어요' })).toBeVisible();
   await expect(page.getByText(receipt.publicId, { exact: true })).toBeVisible();
   const saved = await db.report.findUniqueOrThrow({ where: { publicId: receipt.publicId }, include: { images: true, categories: true, statusHistory: true, region: true } });
   expect(saved.contactPhoneCipher).toBeNull();
@@ -143,5 +138,5 @@ test('unavailable intake preserves entered content and lets the user retry servi
   await page.getByRole('button', { name: '접수 상태 다시 확인', exact: true }).click();
   await expect(page.getByRole('button', { name: '신고 제출', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '이전', exact: true }).click();
-  await expect(page.getByLabel('신고 내용', { exact: true })).toHaveValue('현장에서 확인한 주차 상황을 신고합니다.');
+  await expect(page.getByRole('button', { name: '보행로 통행 방해', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });

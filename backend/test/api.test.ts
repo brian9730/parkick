@@ -30,7 +30,7 @@ describe('Phase 1 API security and honest skeleton responses', () => {
     const health = await request(app).get('/api/health').expect(200);
     assert.equal(health.body.data.services.database, 'not-connected');
     assert.equal(health.headers['cache-control'], 'no-store');
-    for (const path of ['/auth/me', '/dashboard', '/reports', '/reports/any-id']) {
+    for (const path of ['/auth/me', '/dashboard', '/reports', '/reports/nearby?latitude=37&longitude=127', '/reports/any-id']) {
       const response = await request(app).get(`/api/admin${path}`).expect(401);
       assert.equal(response.body.error.code, 'UNAUTHENTICATED');
       assert.ok(response.body.error.requestId);
@@ -62,6 +62,10 @@ describe('Phase 1 API security and honest skeleton responses', () => {
     const map = await request(app).get('/api/admin/reports/map').set('Cookie', cookie).expect(200);
     assert.deepEqual(map.body.data, { mode: 'skeleton', items: [], total: 0, page: 1, pageSize: 200 });
     assert.equal(map.headers['cache-control'], 'no-store');
+    const nearby = await request(app).get('/api/admin/reports/nearby?latitude=37&longitude=127&pageSize=5').set('Cookie', cookie).expect(200);
+    assert.deepEqual(nearby.body.data, { mode: 'skeleton', items: [], total: 0, page: 1, pageSize: 5 });
+    assert.equal(nearby.headers['cache-control'], 'no-store');
+    await request(app).get('/api/admin/reports/nearby?latitude=91&longitude=127').set('Cookie', cookie).expect(400);
     await request(app).get('/api/admin/reports/any-id').set('Cookie', cookie).expect(501);
     const rotated = await request(app).post('/api/admin/auth/login').set('Origin', origin).set('Cookie', cookie).send({ email, password }).expect(200);
     const nextCookie = extractCookie(rotated);

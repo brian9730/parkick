@@ -1,22 +1,24 @@
-import { PrismaClient } from '../generated/prisma/client.js';
+import { Prisma, PrismaClient } from '../generated/prisma/client.js';
 import { matchingOperatorAliases, normalizeOperatorName } from '../catalog/operators.js';
-import type { Prisma } from '../generated/prisma/client.js';
 import { ApiError } from '../middleware/errors.js';
-import type { AdminReportDetail, AdminReportQuery, AdminReportScope, AdminReportSummary, AdminReportTransition } from '../services/admin/adminReportInput.js';
+import type { AdminNearbyReportItem, AdminNearbyReportQuery, AdminReportDetail, AdminReportQuery, AdminReportScope, AdminReportSummary, AdminReportTransition } from '../services/admin/adminReportInput.js';
 import { adminReportMapQuery, type AdminReportMapItem, type AdminReportMapQuery } from '../services/admin/adminReportInput.js';
+import { adminNearbyReportQuery } from '../services/admin/adminReportInput.js';
 import { adminRelatedReportTransition, type AdminRelatedReports, type AdminRelatedReportResult, type AdminRelatedReportTransition } from '../services/admin/adminReportInput.js';
 import { belongsToIncident, distanceMeters, knownIdentity, relatedHistoryId, RELATED_CRITERIA, RELATED_SCAN_LIMIT, RELATED_WINDOW_MS, sameIdentity, type RelatedFacts } from '../services/admin/relatedReportRules.js';
 
 export interface AdminDashboard {
-  mode: 'database'; summary: { today: number; total: number; received: number; processing: number; completed: number };
+  mode: 'database'; summary: { today: number; total: number; received: number; processing: number; completed: number; rejected: number };
   recentReports: AdminReportSummary[];
 }
 export interface AdminReportPage { mode: 'database'; items: AdminReportSummary[]; total: number; page: number; pageSize: number }
 export interface AdminReportMapPage { mode: 'database'; items: AdminReportMapItem[]; total: number; page: number; pageSize: number }
+export interface AdminNearbyReportPage { mode: 'database'; items: AdminNearbyReportItem[]; total: number; page: number; pageSize: number }
 export interface AdminReportRepository {
   dashboard(scope: AdminReportScope): Promise<AdminDashboard>;
   list(scope: AdminReportScope, query: AdminReportQuery): Promise<AdminReportPage>;
   map(scope: AdminReportScope, query: AdminReportMapQuery): Promise<AdminReportMapPage>;
+  nearby(scope: AdminReportScope, query: AdminNearbyReportQuery): Promise<AdminNearbyReportPage>;
   detail(scope: AdminReportScope, publicId: string): Promise<AdminReportDetail>;
   image(scope: AdminReportScope, publicId: string, imageId: string): Promise<{ objectKey: string }>;
   transition(scope: AdminReportScope, publicId: string, input: AdminReportTransition): Promise<AdminReportDetail>;
@@ -108,14 +110,15 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
     const where = scoped(scope);
     const kstDate = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const dayStart = new Date(`${kstDate}T00:00:00+09:00`);
-    const [total, today, received, processing, completed, recent] = await this.client.$transaction([
+    const [total, today, received, processing, completed, rejected, recent] = await this.client.$transaction([
       this.client.report.count({ where }), this.client.report.count({ where: { ...where, createdAt: { gte: dayStart, lt: new Date(dayStart.getTime() + 24 * 60 * 60 * 1000) } } }),
       this.client.report.count({ where: { ...where, status: 'RECEIVED' } }),
       this.client.report.count({ where: { ...where, status: 'PROCESSING' } }),
       this.client.report.count({ where: { ...where, status: 'COMPLETED' } }),
+      this.client.report.count({ where: { ...where, status: 'REJECTED' } }),
       this.client.report.findMany({ where, select: summarySelect, orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }], take: 10 }),
     ], { isolationLevel: 'RepeatableRead' });
-    return { mode: 'database', summary: { total, today, received, processing, completed }, recentReports: recent.map(summary) };
+    return { mode: 'database', summary: { total, today, received, processing, completed, rejected }, recentReports: recent.map(summary) };
   }
 
   async list(scope: AdminReportScope, query: AdminReportQuery): Promise<AdminReportPage> {
@@ -141,6 +144,40 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
     return { mode: 'database', items: rows.map(row => ({ ...summary(row), latitude: row.latitude.toNumber(), longitude: row.longitude.toNumber() })), total, page: query.page, pageSize: query.pageSize };
   }
 
+  async nearby(scope: AdminReportScope, input: AdminNearbyReportQuery): Promise<AdminNearbyReportPage> {
+    const query = adminNearbyReportQuery.parse(input);
+    const where: Prisma.ReportWhereInput = { ...scoped(scope), status: { in: ['RECEIVED', 'PROCESSING'] } };
+    const tenantFilter = scope.tenantId ? Prisma.sql`AND tenant_id = ${scope.tenantId}::uuid` : Prisma.empty;
+    const { latitude, longitude, page, pageSize } = query;
+    const offset = (page - 1) * pageSize;
+    return this.client.$transaction(async transaction => {
+      const total = await transaction.report.count({ where });
+      const nearest = await transaction.$queryRaw<{ id: string; distanceMeters: number }[]>`
+        SELECT id,
+          12742000.0 * asin(sqrt(LEAST(1.0, GREATEST(0.0,
+            power(sin(radians((latitude::double precision - ${latitude}::double precision) / 2.0)), 2)
+            + cos(radians(${latitude}::double precision)) * cos(radians(latitude::double precision))
+              * power(sin(radians((longitude::double precision - ${longitude}::double precision) / 2.0)), 2)
+          )))) AS "distanceMeters"
+        FROM reports
+        WHERE status IN ('RECEIVED', 'PROCESSING') ${tenantFilter}
+        ORDER BY "distanceMeters" ASC, created_at DESC, public_id ASC
+        LIMIT ${pageSize} OFFSET ${offset}
+      `;
+      const rows = nearest.length ? await transaction.report.findMany({
+        where: { id: { in: nearest.map(row => row.id) } },
+        select: { ...summarySelect, id: true, latitude: true, longitude: true },
+      }) : [];
+      const byId = new Map(rows.map(row => [row.id, row]));
+      const items = nearest.map(({ id, distanceMeters }) => {
+        const row = byId.get(id);
+        if (!row) throw new Error('Nearby report snapshot changed');
+        return { ...summary(row), latitude: row.latitude.toNumber(), longitude: row.longitude.toNumber(), distanceMeters: Math.round(distanceMeters) };
+      });
+      return { mode: 'database', items, total, page, pageSize };
+    }, { isolationLevel: 'RepeatableRead', timeout: 10_000 });
+  }
+
   async detail(scope: AdminReportScope, publicId: string): Promise<AdminReportDetail> {
     const where = scoped(scope);
     if (!publicIdValid(publicId)) throw missing();
@@ -159,11 +196,12 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
         anchorPublicId: publicId, eligible: false, reason, criteria: RELATED_CRITERIA, items: [], truncated: reason === 'CANDIDATE_LIMIT',
       });
       if (anchor.status === 'COMPLETED') return unavailable('ANCHOR_COMPLETED');
+      if (anchor.status === 'REJECTED') return unavailable('ANCHOR_REJECTED');
       if (!knownIdentity(anchor)) return unavailable('IDENTITY_UNKNOWN');
       const completions = await completionBoundaries(transaction, anchor);
       if (completions === null) return unavailable('CANDIDATE_LIMIT');
       const rows = await transaction.report.findMany({
-        where: { tenantId: anchor.tenantId, regionId: anchor.regionId, id: { not: anchor.id }, status: { not: 'COMPLETED' },
+        where: { tenantId: anchor.tenantId, regionId: anchor.regionId, id: { not: anchor.id }, status: { in: ['RECEIVED', 'PROCESSING'] },
           createdAt: { gte: new Date(anchor.createdAt.getTime() - RELATED_WINDOW_MS), lte: new Date(anchor.createdAt.getTime() + RELATED_WINDOW_MS) },
           operatorName: { not: null }, deviceId: { not: null } },
         select: relatedSelect, orderBy: [{ createdAt: 'asc' }, { publicId: 'asc' }], take: RELATED_SCAN_LIMIT + 1,
@@ -211,7 +249,7 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
           // validated and committed. Its own completions may push a subsequent
           // bounded scan over the limit; a retry must not depend on that scan.
           if (replay) return { anchorPublicId: publicId, items: rows.map(summary), replayed: true };
-          if (rows.some((row, index) => row.status === 'COMPLETED'
+          if (rows.some((row, index) => row.status === 'COMPLETED' || row.status === 'REJECTED'
             || row.updatedAt.getTime() !== new Date(selection[index]!.expectedUpdatedAt).getTime())) throw conflict();
           const completions = await completionBoundaries(transaction, anchor);
           if (completions === null || rows.some(row => !belongsToIncident(relatedFacts(anchor), relatedFacts(row), completions))) throw conflict();
@@ -275,7 +313,8 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
             && last.publicNote === publicNote && last.internalNote === internalNote;
           if (!replay) {
             if (current.updatedAt.getTime() !== expected.getTime() || current.status === 'COMPLETED'
-              || (current.status === 'PROCESSING' && input.status !== 'COMPLETED')) throw conflict();
+              || current.status === 'REJECTED'
+              || (current.status === 'PROCESSING' && input.status === 'PROCESSING')) throw conflict();
             const now = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
             const changed = await transaction.report.updateMany({
               where: { ...where, id: current.id, updatedAt: expected, status: current.status },
