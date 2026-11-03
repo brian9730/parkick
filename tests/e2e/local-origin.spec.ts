@@ -9,7 +9,7 @@ test('development loopback IP supports browser login, authenticated reads, QR pa
   await page.getByLabel('이메일', { exact: true }).fill(process.env.PARKICK_E2E_ADMIN_EMAIL!);
   await page.getByLabel('비밀번호', { exact: true }).fill(process.env.PARKICK_E2E_ADMIN_PASSWORD!);
   const loginResponse = page.waitForResponse(response => response.url() === `${origin}/api/admin/auth/login` && response.request().method() === 'POST');
-  await page.getByRole('button', { name: '관리자 로그인', exact: true }).click();
+  await page.getByRole('button', { name: '로그인', exact: true }).click();
   const login = await loginResponse;
   expect(await login.request().headerValue('origin')).toBe(origin);
   expect(login.status()).toBe(200);

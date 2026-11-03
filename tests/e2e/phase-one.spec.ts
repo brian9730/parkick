@@ -25,7 +25,7 @@ test('admin pages require server authentication and logout revokes it', async ({
   expect((await page.request.get('/api/admin/dashboard')).status()).toBe(401);
   await page.getByLabel('이메일', { exact: true }).fill(process.env.PARKICK_E2E_ADMIN_EMAIL!);
   await page.getByLabel('비밀번호', { exact: true }).fill(process.env.PARKICK_E2E_ADMIN_PASSWORD!);
-  await page.getByRole('button', { name: '관리자 로그인', exact: true }).click();
+  await page.getByRole('button', { name: '로그인', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/dashboard$/);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('대시보드');
   expect((await page.request.get('/api/admin/dashboard')).status()).toBe(200);

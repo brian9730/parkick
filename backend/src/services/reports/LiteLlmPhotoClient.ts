@@ -18,6 +18,18 @@ export class LiteLlmPhotoClient {
       content.push({ type: 'text', text: `Photo ${index + 1}:` });
       content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${Buffer.from(images[index]!).toString('base64')}` } });
     }
+    return this.complete(content, systemPrompt, signal);
+  }
+
+  async guideFrame(image: Uint8Array, systemPrompt: string, signal: AbortSignal): Promise<string> {
+    return this.complete([
+      { type: 'text', text: 'Analyze this camera frame. Return only the requested JSON object.' },
+      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${Buffer.from(image).toString('base64')}` } },
+    ], systemPrompt, signal);
+  }
+
+  private async complete(content: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>,
+    systemPrompt: string, signal: AbortSignal): Promise<string> {
     const response = await this.send(`${this.config.apiBaseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-litellm-api-key': this.config.apiKey },

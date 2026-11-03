@@ -1,4 +1,12 @@
 .admin-main, .admin-content, .admin-detail-main, .admin-detail-actions { min-width: 0; }
+.field-finding-badge { display: inline-flex; align-items: center; width: fit-content; padding: 3px 7px; border-radius: 6px; background: #fff0d8; color: #8b5913; font-size: 10px; font-weight: 700; line-height: 1.35; }
+.admin-field-findings { border-color: #edd4a7; }
+.admin-field-findings ol { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.admin-field-findings li { padding: 12px; border-radius: 8px; background: #fff9ef; }
+.admin-field-findings li > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.admin-field-findings li strong { color: #674419; font-size: 12px; }
+.admin-field-findings li p { margin-top: 8px; color: #4e6172; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+.admin-field-findings li small { display: block; margin-top: 8px; color: #7a8d9a; font-size: 11px; }
 .admin-dashboard-secondary { margin-top: 20px; }
 .admin-report-table { font-size: 12px; min-width: 820px; }
 .admin-report-table td { padding: 15px 13px; vertical-align: top; line-height: 1.7; color: #415773; }

@@ -3,7 +3,7 @@ export interface AdminProfile {
   email: string;
   name: string;
   // Database accounts carry their stored scope; development mocks grant no production role.
-  role?: 'PLATFORM_ADMIN' | 'TENANT_ADMIN';
+  role?: 'PLATFORM_ADMIN' | 'TENANT_ADMIN' | 'COLLECTOR';
   tenantId?: string | null;
 }
 

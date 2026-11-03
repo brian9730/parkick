@@ -75,7 +75,7 @@ async function login(page: Page) {
   await page.goto('/admin/login');
   await page.getByLabel('이메일', { exact: true }).fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill(password);
-  await page.getByRole('button', { name: '관리자 로그인', exact: true }).click();
+  await page.getByRole('button', { name: '로그인', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/dashboard$/);
 }
 

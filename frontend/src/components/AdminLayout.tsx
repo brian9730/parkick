@@ -8,8 +8,19 @@ import '../features/admin/reports.css';
 export function RequireAdmin() {
   const { session, loading, error, refresh } = useAuth();
   if (loading) return <LoadingState label="관리자 인증을 확인하고 있습니다" />;
-  if (error) return <div className="container auth-error"><ErrorState message={error} onRetry={() => void refresh()} /><Link className="text-link" to="/admin/login">관리자 로그인으로 이동<ChevronRight size={16} /></Link></div>;
-  return session ? <Outlet /> : <Navigate to="/admin/login" replace />;
+  if (error) return <div className="container auth-error"><ErrorState message={error} onRetry={() => void refresh()} /><Link className="text-link" to="/admin/login">운영자 로그인으로 이동<ChevronRight size={16} /></Link></div>;
+  if (!session) return <Navigate to="/admin/login" replace />;
+  if (session.admin.role === 'COLLECTOR') return <Navigate to="/collect" replace />;
+  return session.mode === 'development-mock' || session.admin.role === 'PLATFORM_ADMIN' || session.admin.role === 'TENANT_ADMIN'
+    ? <Outlet /> : <Navigate to="/admin/login" replace />;
+}
+
+export function RequireCollector() {
+  const { session, loading, error, refresh } = useAuth();
+  if (loading) return <LoadingState label="수거 담당자 인증을 확인하고 있습니다" />;
+  if (error) return <div className="container auth-error"><ErrorState message={error} onRetry={() => void refresh()} /><Link className="text-link" to="/admin/login">로그인으로 이동<ChevronRight size={16} /></Link></div>;
+  if (!session) return <Navigate to="/admin/login" replace />;
+  return session.admin.role === 'COLLECTOR' ? <Outlet /> : <Navigate to="/admin/dashboard" replace />;
 }
 
 function AdminBrand({ onClick }: { onClick?: () => void }) {

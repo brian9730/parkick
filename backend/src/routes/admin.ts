@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import type { AdminAuthController } from '../controllers/AdminAuthController.js';
 import type { AdminOverviewController } from '../controllers/AdminOverviewController.js';
+import type { CollectionController } from '../controllers/CollectionController.js';
 import { ApiError } from '../middleware/errors.js';
 
-export function adminRoutes(auth: AdminAuthController, overview: AdminOverviewController): Router {
+export function adminRoutes(auth: AdminAuthController, overview: AdminOverviewController, collection: CollectionController): Router {
   const router = Router();
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -18,9 +19,18 @@ export function adminRoutes(auth: AdminAuthController, overview: AdminOverviewCo
   router.post('/auth/logout', auth.logout);
   router.use(auth.requireAdmin);
   router.get('/auth/me', auth.me);
+  router.use('/collection', auth.requireCollector);
+  router.get('/collection/reports/nearby', collection.nearby);
+  router.get('/collection/reports/map', collection.map);
+  router.get('/collection/reports/:publicId', collection.detail);
+  router.get('/collection/reports/:publicId/images/:imageId', collection.image);
+  router.patch('/collection/reports/:publicId/complete', collection.complete);
+  router.post('/collection/reports/:publicId/missing', collection.missing);
+  router.use(auth.requireManager);
   router.get('/dashboard', overview.dashboard);
   router.get('/reports', overview.reports);
   router.get('/reports/map', overview.map);
+  router.get('/reports/hotspots', overview.hotspots);
   router.get('/reports/nearby', overview.nearby);
   router.get('/reports/:publicId/related', overview.related);
   router.patch('/reports/:publicId/related/status', overview.transitionRelated);

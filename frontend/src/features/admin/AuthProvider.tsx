@@ -50,9 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationPending.current = true;
     try {
       const result = await adminApi.login(email, password);
-      if (requestGeneration !== generation.current) return;
-      setSession(result);
-      setError('');
+      if (requestGeneration === generation.current) {
+        setSession(result);
+        setError('');
+      }
+      return result;
     } finally {
       if (requestGeneration === generation.current) {
         mutationPending.current = false;

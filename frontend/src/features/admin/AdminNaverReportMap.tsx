@@ -1,9 +1,10 @@
 import { MapPin, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { AdminMapReport } from '../../api/admin';
+import type { ReactNode } from 'react';
+import type { AdminHotspotZone, AdminMapReport } from '../../api/admin';
 import { Button, LoadingState } from '../../components/ui';
 import { loadNaverMaps, subscribeNaverAuthFailure } from '../map/naver';
-import type { NaverInfoWindow, NaverMap, NaverMapEventListener, NaverMarker } from '../map/naver';
+import type { NaverCircle, NaverInfoWindow, NaverMap, NaverMapEventListener, NaverMarker } from '../map/naver';
 import { isValidCoordinates } from '../map/location';
 import { createReportMapInfo, createReportMapMarker } from './map-info';
 import { clusterMapReports } from './map-clusters';
@@ -13,7 +14,16 @@ const connectionError = '지도를 불러오지 못했습니다. 연결 상태�
 interface CurrentLocation { latitude: number; longitude: number }
 interface ReportFocusRequest { publicId: string; sequence: number }
 
-export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: { reports: AdminMapReport[]; currentLocation?: CurrentLocation; focusRequest?: ReportFocusRequest | null }) {
+export function AdminNaverReportMap({ reports, currentLocation, focusRequest, hotspots, showHotspots = false, hotspotPanel, detailBasePath = '/admin/reports', collectionPage = 1 }: {
+  reports: AdminMapReport[];
+  currentLocation?: CurrentLocation;
+  focusRequest?: ReportFocusRequest | null;
+  hotspots?: AdminHotspotZone[];
+  showHotspots?: boolean;
+  hotspotPanel?: ReactNode;
+  detailBasePath?: '/admin/reports' | '/collect/reports';
+  collectionPage?: number;
+}) {
   const clientId = (import.meta.env.VITE_NAVER_MAP_CLIENT_ID as string | undefined)?.trim() || '';
   const currentLatitude = currentLocation?.latitude;
   const currentLongitude = currentLocation?.longitude;
@@ -23,11 +33,18 @@ export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: 
   const containerRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<(() => void) | null>(null);
   const focusRef = useRef<((request: ReportFocusRequest) => void) | null>(null);
+  const hotspotRendererRef = useRef<((zones: AdminHotspotZone[], enabled: boolean) => void) | null>(null);
+  const hotspotInputRef = useRef({ zones: hotspots ?? [], enabled: showHotspots });
   const pendingFocusRef = useRef<ReportFocusRequest | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{ attempt: number; reports: AdminMapReport[]; locationKey: string; error: string } | null>(null);
   const current = state?.attempt === attempt && state.reports === reports && state.locationKey === locationKey ? state : null;
   const ready = Boolean(current && !current.error);
+
+  useEffect(() => {
+    hotspotInputRef.current = { zones: hotspots ?? [], enabled: showHotspots };
+    hotspotRendererRef.current?.(hotspotInputRef.current.zones, hotspotInputRef.current.enabled);
+  }, [hotspots, showHotspots]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -40,6 +57,7 @@ export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: 
     let resize: ResizeObserver | undefined;
     let frame: number | undefined;
     const markers: NaverMarker[] = [];
+    const hotspotCircles: NaverCircle[] = [];
     const listeners: NaverMapEventListener[] = [];
     let markerEvents: AbortController | undefined;
     let removeListener: ((listener: NaverMapEventListener) => void) | undefined;
@@ -48,16 +66,21 @@ export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: 
       markerEvents = undefined;
       for (const marker of markers.splice(0)) marker.setMap(null);
     }
+    function clearHotspots() {
+      for (const circle of hotspotCircles.splice(0)) circle.setMap(null);
+    }
     function dispose() {
       resize?.disconnect();
       if (frame !== undefined) cancelAnimationFrame(frame);
       frame = undefined;
       fitRef.current = null;
       focusRef.current = null;
+      hotspotRendererRef.current = null;
       info?.close();
       info = null;
       for (const listener of listeners.splice(0)) removeListener?.(listener);
       clearMarkers();
+      clearHotspots();
       locationMarker?.setMap(null);
       locationMarker = null;
       map?.destroy();
@@ -130,6 +153,20 @@ export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: 
         const infoWindow = new maps.InfoWindow({ content: document.createElement('div'), maxWidth: 300, borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true });
         info = infoWindow;
         removeListener = listener => maps.Event.removeListener(listener);
+        hotspotRendererRef.current = (zones, enabled) => {
+          clearHotspots();
+          if (!enabled || !maps.Circle) return;
+          for (const zone of zones) {
+            if (!isValidCoordinates(zone.latitude, zone.longitude) || !Number.isFinite(zone.radiusMeters) || zone.radiusMeters <= 0 || zone.count < 3) continue;
+            const center = new maps.LatLng(zone.latitude, zone.longitude);
+            const color = zone.level === 'red' ? '#e54c5d' : '#e9b931';
+            hotspotCircles.push(new maps.Circle({
+              map: instance, center, radius: zone.radiusMeters, fillColor: color, fillOpacity: 0.19,
+              strokeColor: color, strokeOpacity: 0.9, strokeWeight: 2, clickable: false,
+            }));
+          }
+        };
+        hotspotRendererRef.current(hotspotInputRef.current.zones, hotspotInputRef.current.enabled);
         function renderMarkers() {
           if (!active || authenticationFailed) return;
           const zoom = getZoom();
@@ -152,7 +189,7 @@ export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: 
             const position = new maps.LatLng(cluster.latitude, cluster.longitude);
             const expandable = cluster.hasDistinctPositions && zoom < maxZoom;
             const icon = createReportMapMarker(group, expandable);
-            const marker = new maps.Marker({ map: instance, position, draggable: false, title: icon.title, icon: { content: icon, anchor: new Point(20, 20), size: { width: 40, height: 40 } } });
+            const marker = new maps.Marker({ map: instance, position, draggable: false, zIndex: 10, title: icon.title, icon: { content: icon, anchor: new Point(20, 20), size: { width: 40, height: 40 } } });
             markers.push(marker);
             const activate = () => {
               if (!active || authenticationFailed) return;
@@ -170,7 +207,7 @@ export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: 
                 }
                 scheduleRender();
               } else {
-                infoWindow.setContent(createReportMapInfo(group, () => { infoWindow.close(); icon.focus(); }));
+                infoWindow.setContent(createReportMapInfo(group, () => { infoWindow.close(); icon.focus(); }, detailBasePath, collectionPage));
                 infoWindow.open(instance, position);
               }
             };
@@ -209,7 +246,7 @@ export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: 
           infoWindow.setContent(createReportMapInfo([report], () => {
             selectedReportId = null;
             infoWindow.close();
-          }));
+          }, detailBasePath, collectionPage));
           infoWindow.open(instance, position);
         };
         if (pendingFocusRef.current) focusRef.current(pendingFocusRef.current);
@@ -233,7 +270,7 @@ export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: 
       if (active && !authenticationFailed) setState({ attempt, reports, locationKey, error: connectionError });
     });
     return () => { active = false; unsubscribe(); dispose(); };
-  }, [clientId, reports, attempt, currentLatitude, currentLongitude, hasCurrentLocation, locationKey]);
+  }, [clientId, reports, attempt, currentLatitude, currentLongitude, hasCurrentLocation, locationKey, detailBasePath, collectionPage]);
 
   useEffect(() => {
     pendingFocusRef.current = focusRequest ?? null;
@@ -244,6 +281,7 @@ export function AdminNaverReportMap({ reports, currentLocation, focusRequest }: 
     {ready && <div className="admin-map-toolbar"><Button variant="secondary" className="admin-map-fit" onClick={() => fitRef.current?.()}><MapPin size={15} />{hasCurrentLocation ? reports.length ? '현재 위치와 가까운 신고 보기' : '현재 위치로 이동' : '표시된 신고 모아보기'}</Button></div>}
     <div className="admin-map-frame">
       <div ref={containerRef} className="admin-report-map" role="region" aria-label="신고 위치 지도" aria-busy={Boolean(clientId && !current)} />
+      {ready && hotspotPanel}
       {!clientId || current?.error ? <div className="admin-map-unavailable" role={current?.error ? 'alert' : 'status'}><MapPin size={28} aria-hidden="true" /><strong>{!clientId ? '지도 서비스 미연결' : '지도를 불러오지 못했어요'}</strong><p>{!clientId ? '지도 연결 설정이 필요합니다. 신고 목록에서 접수된 내용을 확인할 수 있어요.' : current?.error}</p>{clientId && <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}><RotateCcw size={16} />지도 다시 연결</Button>}</div>
         : !ready && <div className="admin-map-loading"><LoadingState label="신고 위치 지도를 불러오고 있습니다" /></div>}
     </div>

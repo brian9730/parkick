@@ -12,6 +12,11 @@ const environmentSchema = z.object({
   DEV_ADMIN_PASSWORD: z.string().default(''),
   DEV_ADMIN_NAME: z.string().min(1).max(80).default('개발 관리자'),
   AI_PROVIDER: z.preprocess(value => value === '' ? undefined : value, z.enum(['disabled', 'mock', 'bedrock', 'litellm']).optional()),
+  CHATBOT_PROVIDER: z.enum(['disabled', 'mock', 'gateway']).default('disabled'),
+  CHATBOT_BASE_URL: z.string().default(''),
+  CHATBOT_API_KEY: z.string().default(''),
+  CHATBOT_MODEL: z.enum(['bedrock-haiku', 'bedrock-sonnet', 'bedrock-gpt-5.6-luna']).default('bedrock-haiku'),
+  CHATBOT_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(20000),
   AWS_REGION: z.string().trim().max(100).default(''),
   BEDROCK_REGION: z.string().trim().max(100).default(''),
   BEDROCK_REPORT_MODEL_ID: z.string().trim().max(2048).default(''),
@@ -31,6 +36,8 @@ const environmentSchema = z.object({
 export type AIConfig = { mode: 'mock' | 'disabled' }
   | { mode: 'bedrock'; region: string; modelId: string }
   | { mode: 'litellm'; apiBaseUrl: string; apiKey: string; modelId: string };
+export type ChatbotConfig = { mode: 'disabled' | 'mock'; timeoutMs: number }
+  | { mode: 'gateway'; timeoutMs: number; baseUrl: string; apiKey: string; model: string };
 
 /** Accept only a HTTPS origin or its /v1 API base, never a path with URL credentials. */
 function liteLlmApiBaseUrl(value: string): string {
@@ -63,6 +70,7 @@ export interface AppConfig {
   devAdmin: { email: string; password: string; name: string } | null;
   sessionTtlMs: number;
   ai: AIConfig;
+  chatbot?: ChatbotConfig;
   reports?: ReportConfig;
 }
 
@@ -98,6 +106,24 @@ export function readConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     throw new Error(`환경변수 형식을 확인하세요: ${parsed.error.issues.map((issue) => issue.path.join('.')).join(', ')}`);
   }
   const env = parsed.data;
+  if (env.CHATBOT_PROVIDER === 'mock' && env.NODE_ENV === 'production') {
+    throw new Error('운영 환경에서는 MOCK 챗봇을 사용할 수 없습니다.');
+  }
+  let chatbot: ChatbotConfig = { mode: env.CHATBOT_PROVIDER === 'mock' ? 'mock' : 'disabled', timeoutMs: env.CHATBOT_TIMEOUT_MS };
+  if (env.CHATBOT_PROVIDER === 'gateway') {
+    let gateway: URL;
+    try { gateway = new URL(env.CHATBOT_BASE_URL); }
+    catch { throw new Error('CHATBOT_BASE_URL에 HTTPS 게이트웨이 원점 주소를 설정하세요.'); }
+    if (gateway.protocol !== 'https:' || gateway.username || gateway.password || gateway.search || gateway.hash
+      || gateway.pathname !== '/' || env.CHATBOT_BASE_URL.trim() !== env.CHATBOT_BASE_URL) {
+      throw new Error('CHATBOT_BASE_URL은 경로·인증정보가 없는 HTTPS 게이트웨이 원점 주소여야 합니다.');
+    }
+    if (!/^sk-[A-Za-z0-9_-]{22}$/.test(env.CHATBOT_API_KEY)) {
+      throw new Error('CHATBOT_API_KEY에 발급받은 25자 키를 설정하세요.');
+    }
+    chatbot = { mode: 'gateway', baseUrl: gateway.origin, apiKey: env.CHATBOT_API_KEY,
+      model: env.CHATBOT_MODEL, timeoutMs: env.CHATBOT_TIMEOUT_MS };
+  }
   const origin = new URL(env.FRONTEND_ORIGIN);
   if (!['http:', 'https:'].includes(origin.protocol) || origin.origin !== env.FRONTEND_ORIGIN) {
     throw new Error('FRONTEND_ORIGIN은 경로가 없는 http/https Origin이어야 합니다.');
@@ -172,6 +198,7 @@ export function readConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
       name: env.DEV_ADMIN_NAME,
     } : null,
     sessionTtlMs: 8 * 60 * 60 * 1000,
+    chatbot,
     ai: aiMode === 'bedrock'
       ? { mode: aiMode, region: bedrockRegion, modelId: env.BEDROCK_REPORT_MODEL_ID }
       : aiMode === 'litellm'

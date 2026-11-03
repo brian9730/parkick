@@ -2,6 +2,7 @@ import { parse, serialize, type SerializeOptions } from 'cookie';
 import type { Request, RequestHandler } from 'express';
 import { z } from 'zod';
 import type { AppConfig } from '../config.js';
+import { ApiError } from '../middleware/errors.js';
 import type { AdminAuthService } from '../services/admin/AdminAuthService.js';
 
 const loginSchema = z.strictObject({ email: z.email().max(254).trim(), password: z.string().min(1).max(128) });
@@ -39,6 +40,19 @@ export class AdminAuthController {
   requireAdmin: RequestHandler = async (request, response, next) => {
     response.locals.admin = await this.service.authenticate(readToken(request));
     next();
+  };
+
+  requireManager: RequestHandler = (_request, response, next) => {
+    const role = response.locals.admin?.role;
+    if (role === 'PLATFORM_ADMIN' || role === 'TENANT_ADMIN'
+      || (this.service.mode === 'development-mock' && !role)) { next(); return; }
+    next(new ApiError(403, 'FORBIDDEN', '관리자 권한이 필요합니다.'));
+  };
+
+  requireCollector: RequestHandler = (_request, response, next) => {
+    const admin = response.locals.admin;
+    if (admin?.role === 'COLLECTOR' && admin.tenantId) { next(); return; }
+    next(new ApiError(403, 'FORBIDDEN', '수거 담당자 권한이 필요합니다.'));
   };
 
   me: RequestHandler = (_request, response) => {

@@ -56,7 +56,8 @@ export class AdminAuthService {
     if (this.mode !== 'database') return true;
     // Never infer platform privileges from a missing role or tenant association.
     return (admin.role === 'PLATFORM_ADMIN' && admin.tenantId === null)
-      || (admin.role === 'TENANT_ADMIN' && typeof admin.tenantId === 'string' && admin.tenantId.length > 0);
+      || ((admin.role === 'TENANT_ADMIN' || admin.role === 'COLLECTOR')
+        && typeof admin.tenantId === 'string' && admin.tenantId.length > 0);
   }
 
   async login(email: string, password: string, previousToken?: string): Promise<{ admin: AdminProfile; token: string }> {

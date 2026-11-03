@@ -6,7 +6,7 @@ const destination = {
   latitude: 37.302573,
   longitude: 127.072797,
   destinationName: '경기도 용인시 수지구 상현동 30-6',
-  appUrl: 'https://15.165.235.154/admin/dashboard?mode=collection',
+  appUrl: 'https://15.165.235.154/collect',
 };
 
 test('iOS walking route uses the official app scheme, current-location origin, and encoded name', () => {

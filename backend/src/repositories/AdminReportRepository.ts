@@ -1,11 +1,12 @@
 import { Prisma, PrismaClient } from '../generated/prisma/client.js';
 import { matchingOperatorAliases, normalizeOperatorName } from '../catalog/operators.js';
 import { ApiError } from '../middleware/errors.js';
-import type { AdminNearbyReportItem, AdminNearbyReportQuery, AdminReportDetail, AdminReportQuery, AdminReportScope, AdminReportSummary, AdminReportTransition } from '../services/admin/adminReportInput.js';
+import type { AdminNearbyReportItem, AdminNearbyReportQuery, AdminReportDetail, AdminReportHotspotQuery, AdminReportQuery, AdminReportScope, AdminReportSummary, AdminReportTransition, CollectorCompletion, CollectorMissing, CollectorReportDetail } from '../services/admin/adminReportInput.js';
 import { adminReportMapQuery, type AdminReportMapItem, type AdminReportMapQuery } from '../services/admin/adminReportInput.js';
-import { adminNearbyReportQuery } from '../services/admin/adminReportInput.js';
+import { adminNearbyReportQuery, adminReportHotspotQuery } from '../services/admin/adminReportInput.js';
 import { adminRelatedReportTransition, type AdminRelatedReports, type AdminRelatedReportResult, type AdminRelatedReportTransition } from '../services/admin/adminReportInput.js';
 import { belongsToIncident, distanceMeters, knownIdentity, relatedHistoryId, RELATED_CRITERIA, RELATED_SCAN_LIMIT, RELATED_WINDOW_MS, sameIdentity, type RelatedFacts } from '../services/admin/relatedReportRules.js';
+import { reportHotspots, type HotspotZone } from '../services/admin/reportHotspots.js';
 
 export interface AdminDashboard {
   mode: 'database'; summary: { today: number; total: number; received: number; processing: number; completed: number; rejected: number };
@@ -13,17 +14,24 @@ export interface AdminDashboard {
 }
 export interface AdminReportPage { mode: 'database'; items: AdminReportSummary[]; total: number; page: number; pageSize: number }
 export interface AdminReportMapPage { mode: 'database'; items: AdminReportMapItem[]; total: number; page: number; pageSize: number }
+export interface AdminReportHotspots { mode: 'database'; zones: HotspotZone[]; totalReports: number }
 export interface AdminNearbyReportPage { mode: 'database'; items: AdminNearbyReportItem[]; total: number; page: number; pageSize: number }
 export interface AdminReportRepository {
   dashboard(scope: AdminReportScope): Promise<AdminDashboard>;
   list(scope: AdminReportScope, query: AdminReportQuery): Promise<AdminReportPage>;
   map(scope: AdminReportScope, query: AdminReportMapQuery): Promise<AdminReportMapPage>;
+  hotspots(scope: AdminReportScope, query: AdminReportHotspotQuery): Promise<AdminReportHotspots>;
   nearby(scope: AdminReportScope, query: AdminNearbyReportQuery): Promise<AdminNearbyReportPage>;
   detail(scope: AdminReportScope, publicId: string): Promise<AdminReportDetail>;
   image(scope: AdminReportScope, publicId: string, imageId: string): Promise<{ objectKey: string }>;
   transition(scope: AdminReportScope, publicId: string, input: AdminReportTransition): Promise<AdminReportDetail>;
   related(scope: AdminReportScope, publicId: string): Promise<AdminRelatedReports>;
   transitionRelated(scope: AdminReportScope, publicId: string, input: AdminRelatedReportTransition): Promise<AdminRelatedReportResult>;
+  collectionMap(scope: AdminReportScope, query: AdminReportMapQuery): Promise<AdminReportMapPage>;
+  collectionDetail(scope: AdminReportScope, publicId: string): Promise<CollectorReportDetail>;
+  collectionImage(scope: AdminReportScope, publicId: string, imageId: string): Promise<{ objectKey: string }>;
+  collectionComplete(scope: AdminReportScope, publicId: string, input: CollectorCompletion): Promise<CollectorReportDetail>;
+  collectionMissing(scope: AdminReportScope, publicId: string, input: CollectorMissing): Promise<CollectorReportDetail>;
   close(): Promise<void>;
 }
 
@@ -34,10 +42,10 @@ function conflict(): ApiError { return new ApiError(409, 'REPORT_STATUS_CONFLICT
 function scoped(scope: AdminReportScope): Prisma.ReportWhereInput {
   if (!UUID.test(scope.adminId)) throw new ApiError(403, 'ADMIN_SCOPE_REQUIRED', '관리자 권한 범위를 확인해주세요.');
   if (scope.role === 'PLATFORM_ADMIN' && scope.tenantId === null) return {};
-  if (scope.role === 'TENANT_ADMIN' && typeof scope.tenantId === 'string' && UUID.test(scope.tenantId)) return { tenantId: scope.tenantId };
+  if ((scope.role === 'TENANT_ADMIN' || scope.role === 'COLLECTOR') && typeof scope.tenantId === 'string' && UUID.test(scope.tenantId)) return { tenantId: scope.tenantId };
   throw new ApiError(403, 'ADMIN_SCOPE_REQUIRED', '관리자 권한 범위를 확인해주세요.');
 }
-function filtered(scope: AdminReportScope, query: AdminReportQuery): Prisma.ReportWhereInput {
+function filtered(scope: AdminReportScope, query: Pick<AdminReportQuery, 'status' | 'q'>): Prisma.ReportWhereInput {
   const aliases = matchingOperatorAliases(query.q);
   return {
     ...scoped(scope), ...(query.status ? { status: query.status } : {}),
@@ -52,6 +60,7 @@ const summarySelect = {
   operatorName: true, deviceId: true, address: true,
   categories: { select: { category: { select: { name: true } } }, orderBy: [{ category: { sortOrder: 'asc' } }, { categoryId: 'asc' }] },
   tenant: { select: { id: true, name: true } }, region: { select: { id: true, name: true } },
+  fieldFindings: { where: { status: 'PENDING_REVIEW' }, select: { status: true }, take: 1 },
 } satisfies Prisma.ReportSelect;
 const detailSelect = {
   ...summarySelect, latitude: true, longitude: true, finalReportText: true, userDescription: true, contactPhoneMasked: true,
@@ -60,6 +69,19 @@ const detailSelect = {
     select: { id: true, newStatus: true, createdAt: true, completionMethod: true, publicNote: true, internalNote: true, admin: { select: { name: true } } },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   },
+  fieldFindings: {
+    select: { id: true, type: true, note: true, status: true, createdAt: true, reviewedAt: true,
+      collector: { select: { name: true } }, reviewer: { select: { name: true } } },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  },
+} satisfies Prisma.ReportSelect;
+const collectionDetailSelect = {
+  ...summarySelect, latitude: true, longitude: true, finalReportText: true, userDescription: true,
+  images: { select: { id: true }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+  statusHistory: { select: { id: true, newStatus: true, createdAt: true, completionMethod: true, publicNote: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+  fieldFindings: { select: { id: true, type: true, note: true, status: true, createdAt: true },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
 } satisfies Prisma.ReportSelect;
 type SummaryRow = Prisma.ReportGetPayload<{ select: typeof summarySelect }>;
 const relatedSelect = { ...summarySelect, id: true, tenantId: true, regionId: true, latitude: true, longitude: true } satisfies Prisma.ReportSelect;
@@ -84,6 +106,7 @@ function summary(row: SummaryRow): AdminReportSummary {
     completionMethod: row.completionMethod, completedAt: row.completedAt?.toISOString() ?? null,
     operatorName: normalizeOperatorName(row.operatorName), deviceId: row.deviceId, address: row.address,
     categories: row.categories.map(item => item.category.name), tenant: row.tenant, region: row.region,
+    hasPendingFieldFinding: row.fieldFindings?.some(finding => finding.status === 'PENDING_REVIEW') ?? false,
   };
 }
 function detail(row: Prisma.ReportGetPayload<{ select: typeof detailSelect }>): AdminReportDetail {
@@ -95,6 +118,22 @@ function detail(row: Prisma.ReportGetPayload<{ select: typeof detailSelect }>): 
       id: event.id, status: event.newStatus, createdAt: event.createdAt.toISOString(), completionMethod: event.completionMethod,
       publicNote: event.publicNote, internalNote: event.internalNote, adminName: event.admin?.name ?? null,
     })),
+    fieldFindings: (row.fieldFindings ?? []).map(finding => ({
+      id: finding.id, type: finding.type, note: finding.note, status: finding.status,
+      createdAt: finding.createdAt.toISOString(), collectorName: finding.collector.name,
+      reviewedAt: finding.reviewedAt?.toISOString() ?? null, reviewerName: finding.reviewer?.name ?? null,
+    })),
+  };
+}
+function collectionDetail(row: Prisma.ReportGetPayload<{ select: typeof collectionDetailSelect }>): CollectorReportDetail {
+  return {
+    ...summary(row), latitude: row.latitude.toNumber(), longitude: row.longitude.toNumber(),
+    finalReportText: row.finalReportText, userDescription: row.userDescription,
+    images: row.images.map(image => ({ id: image.id, url: `/api/admin/collection/reports/${encodeURIComponent(row.publicId)}/images/${image.id}` })),
+    history: row.statusHistory.map(event => ({ id: event.id, status: event.newStatus,
+      createdAt: event.createdAt.toISOString(), completionMethod: event.completionMethod, publicNote: event.publicNote })),
+    fieldFindings: row.fieldFindings.map(finding => ({ id: finding.id, type: finding.type,
+      note: finding.note, status: finding.status, createdAt: finding.createdAt.toISOString() })),
   };
 }
 
@@ -144,10 +183,37 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
     return { mode: 'database', items: rows.map(row => ({ ...summary(row), latitude: row.latitude.toNumber(), longitude: row.longitude.toNumber() })), total, page: query.page, pageSize: query.pageSize };
   }
 
+  async collectionMap(scope: AdminReportScope, input: AdminReportMapQuery): Promise<AdminReportMapPage> {
+    if (scope.role !== 'COLLECTOR') throw new ApiError(403, 'FORBIDDEN', '수거 담당자 권한이 필요합니다.');
+    const query = adminReportMapQuery.parse(input);
+    const where: Prisma.ReportWhereInput = { ...scoped(scope), status: { in: ['RECEIVED', 'PROCESSING'] },
+      fieldFindings: { none: { status: 'PENDING_REVIEW' } } };
+    const [total, rows] = await this.client.$transaction([
+      this.client.report.count({ where }),
+      this.client.report.findMany({
+        where, select: { ...summarySelect, latitude: true, longitude: true },
+        orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize,
+      }),
+    ], { isolationLevel: 'RepeatableRead' });
+    return { mode: 'database', items: rows.map(row => ({ ...summary(row), latitude: row.latitude.toNumber(), longitude: row.longitude.toNumber() })), total, page: query.page, pageSize: query.pageSize };
+  }
+
+  async hotspots(scope: AdminReportScope, input: AdminReportHotspotQuery): Promise<AdminReportHotspots> {
+    const query = adminReportHotspotQuery.parse(input);
+    const rows = await this.client.report.findMany({
+      where: filtered(scope, query), select: { latitude: true, longitude: true },
+    });
+    return { mode: 'database', ...reportHotspots(rows.map(row => ({ latitude: row.latitude.toNumber(), longitude: row.longitude.toNumber() }))) };
+  }
+
   async nearby(scope: AdminReportScope, input: AdminNearbyReportQuery): Promise<AdminNearbyReportPage> {
     const query = adminNearbyReportQuery.parse(input);
-    const where: Prisma.ReportWhereInput = { ...scoped(scope), status: { in: ['RECEIVED', 'PROCESSING'] } };
+    const where: Prisma.ReportWhereInput = { ...scoped(scope), status: { in: ['RECEIVED', 'PROCESSING'] },
+      ...(scope.role === 'COLLECTOR' ? { fieldFindings: { none: { status: 'PENDING_REVIEW' as const } } } : {}) };
     const tenantFilter = scope.tenantId ? Prisma.sql`AND tenant_id = ${scope.tenantId}::uuid` : Prisma.empty;
+    const pendingFilter = scope.role === 'COLLECTOR' ? Prisma.sql`AND NOT EXISTS (
+      SELECT 1 FROM report_field_findings finding WHERE finding.report_id = reports.id AND finding.status = 'PENDING_REVIEW'
+    )` : Prisma.empty;
     const { latitude, longitude, page, pageSize } = query;
     const offset = (page - 1) * pageSize;
     return this.client.$transaction(async transaction => {
@@ -160,7 +226,7 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
               * power(sin(radians((longitude::double precision - ${longitude}::double precision) / 2.0)), 2)
           )))) AS "distanceMeters"
         FROM reports
-        WHERE status IN ('RECEIVED', 'PROCESSING') ${tenantFilter}
+        WHERE status IN ('RECEIVED', 'PROCESSING') ${tenantFilter} ${pendingFilter}
         ORDER BY "distanceMeters" ASC, created_at DESC, public_id ASC
         LIMIT ${pageSize} OFFSET ${offset}
       `;
@@ -184,6 +250,17 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
     const row = await this.client.report.findFirst({ where: { ...where, publicId }, select: detailSelect });
     if (!row) throw missing();
     return detail(row);
+  }
+
+  async collectionDetail(scope: AdminReportScope, publicId: string): Promise<CollectorReportDetail> {
+    if (scope.role !== 'COLLECTOR') throw new ApiError(403, 'FORBIDDEN', '수거 담당자 권한이 필요합니다.');
+    const where = scoped(scope);
+    if (!publicIdValid(publicId)) throw missing();
+    const row = await this.client.report.findFirst({
+      where: { ...where, publicId, status: { in: ['RECEIVED', 'PROCESSING'] } }, select: collectionDetailSelect,
+    });
+    if (!row) throw missing();
+    return collectionDetail(row);
   }
 
   async related(scope: AdminReportScope, publicId: string): Promise<AdminRelatedReports> {
@@ -265,6 +342,10 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
               newStatus: 'COMPLETED', completionMethod: input.completionMethod, adminId: scope.adminId,
               publicNote, internalNote, createdAt: now,
             }, select: { id: true } });
+            await transaction.reportFieldFinding.updateMany({
+              where: { reportId: row.id, status: 'PENDING_REVIEW' },
+              data: { status: 'REVIEWED', reviewedAt: now, reviewedByAdminId: scope.adminId },
+            });
           }
           const updated = await transaction.report.findMany({ where: { ...where, publicId: { in: selectedIds } }, select: summarySelect, orderBy: { publicId: 'asc' } });
           return { anchorPublicId: publicId, items: updated.map(summary), replayed: false };
@@ -288,6 +369,113 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
     });
     if (!image) throw missing();
     return image;
+  }
+
+  async collectionImage(scope: AdminReportScope, publicId: string, imageId: string): Promise<{ objectKey: string }> {
+    if (scope.role !== 'COLLECTOR') throw new ApiError(403, 'FORBIDDEN', '수거 담당자 권한이 필요합니다.');
+    const where = scoped(scope);
+    if (!publicIdValid(publicId) || !UUID.test(imageId)) throw missing();
+    const image = await this.client.reportImage.findFirst({
+      where: { id: imageId, report: { ...where, publicId, status: { in: ['RECEIVED', 'PROCESSING'] } } },
+      select: { objectKey: true },
+    });
+    if (!image) throw missing();
+    return image;
+  }
+
+  async collectionComplete(scope: AdminReportScope, publicId: string, input: CollectorCompletion): Promise<CollectorReportDetail> {
+    if (scope.role !== 'COLLECTOR') throw new ApiError(403, 'FORBIDDEN', '수거 담당자 권한이 필요합니다.');
+    const where = scoped(scope);
+    if (!publicIdValid(publicId)) throw missing();
+    const expected = new Date(input.expectedUpdatedAt);
+    const publicNote = '현장 수거를 완료했습니다.';
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.client.$transaction(async transaction => {
+          const current = await transaction.report.findFirst({ where: { ...where, publicId }, select: {
+            id: true, status: true, updatedAt: true, completedByAdminId: true, completionMethod: true,
+            fieldFindings: { where: { status: 'PENDING_REVIEW' }, select: { id: true }, take: 1 },
+            statusHistory: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1,
+              select: { adminId: true, newStatus: true, completionMethod: true, publicNote: true } },
+          } });
+          if (!current) throw missing();
+          const last = current.statusHistory[0];
+          const replay = expected.getTime() < current.updatedAt.getTime()
+            && current.status === 'COMPLETED' && current.completedByAdminId === scope.adminId
+            && current.completionMethod === 'COLLECTED' && last?.adminId === scope.adminId
+            && last.newStatus === 'COMPLETED' && last.completionMethod === 'COLLECTED' && last.publicNote === publicNote;
+          if (!replay) {
+            if (current.status === 'COMPLETED' || current.status === 'REJECTED'
+              || current.updatedAt.getTime() !== expected.getTime()) throw conflict();
+            if (current.fieldFindings.length) throw new ApiError(409, 'FIELD_FINDING_PENDING', '현장 미발견 기록이 관리자 검토 중입니다.');
+            const now = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
+            const changed = await transaction.report.updateMany({
+              where: { ...where, id: current.id, updatedAt: expected, status: current.status,
+                fieldFindings: { none: { status: 'PENDING_REVIEW' } } },
+              data: { status: 'COMPLETED', completionMethod: 'COLLECTED', completedAt: now,
+                completedByAdminId: scope.adminId, updatedAt: now },
+            });
+            if (changed.count !== 1) throw conflict();
+            await transaction.reportStatusHistory.create({ data: {
+              reportId: current.id, previousStatus: current.status, newStatus: 'COMPLETED', completionMethod: 'COLLECTED',
+              adminId: scope.adminId, publicNote, createdAt: now,
+            }, select: { id: true } });
+          }
+          const row = await transaction.report.findFirst({ where: { ...where, id: current.id }, select: collectionDetailSelect });
+          if (!row) throw missing();
+          return collectionDetail(row);
+        }, { isolationLevel: 'Serializable', timeout: 10_000 });
+      } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'P2034') {
+          if (attempt < 2) continue;
+          throw conflict();
+        }
+        throw error;
+      }
+    }
+    throw conflict();
+  }
+
+  async collectionMissing(scope: AdminReportScope, publicId: string, input: CollectorMissing): Promise<CollectorReportDetail> {
+    if (scope.role !== 'COLLECTOR') throw new ApiError(403, 'FORBIDDEN', '수거 담당자 권한이 필요합니다.');
+    const where = scoped(scope);
+    if (!publicIdValid(publicId)) throw missing();
+    const expected = new Date(input.expectedUpdatedAt);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.client.$transaction(async transaction => {
+          const current = await transaction.report.findFirst({ where: { ...where, publicId }, select: {
+            id: true, status: true, updatedAt: true,
+            fieldFindings: { where: { status: 'PENDING_REVIEW' }, select: { id: true }, take: 1 },
+          } });
+          if (!current) throw missing();
+          if (current.status === 'COMPLETED' || current.status === 'REJECTED'
+            || current.updatedAt.getTime() !== expected.getTime()) throw conflict();
+          if (current.fieldFindings.length) throw new ApiError(409, 'FIELD_FINDING_PENDING', '현장 미발견 기록이 관리자 검토 중입니다.');
+          const now = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
+          const changed = await transaction.report.updateMany({
+            where: { ...where, id: current.id, updatedAt: expected, status: current.status,
+              fieldFindings: { none: { status: 'PENDING_REVIEW' } } },
+            data: { updatedAt: now },
+          });
+          if (changed.count !== 1) throw conflict();
+          await transaction.reportFieldFinding.create({ data: {
+            reportId: current.id, collectorId: scope.adminId, type: 'DEVICE_NOT_FOUND', note: input.note,
+            status: 'PENDING_REVIEW', createdAt: now,
+          }, select: { id: true } });
+          const row = await transaction.report.findFirst({ where: { ...where, id: current.id }, select: collectionDetailSelect });
+          if (!row) throw missing();
+          return collectionDetail(row);
+        }, { isolationLevel: 'Serializable', timeout: 10_000 });
+      } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && (error.code === 'P2034' || error.code === 'P2002')) {
+          if (attempt < 2) continue;
+          throw conflict();
+        }
+        throw error;
+      }
+    }
+    throw conflict();
   }
 
   async transition(scope: AdminReportScope, publicId: string, input: AdminReportTransition): Promise<AdminReportDetail> {
@@ -326,6 +514,12 @@ export class PrismaAdminReportRepository implements AdminReportRepository {
               reportId: current.id, previousStatus: current.status, newStatus: input.status, completionMethod,
               adminId: scope.adminId, publicNote, internalNote, createdAt: now,
             }, select: { id: true } });
+            if (input.status === 'COMPLETED' || input.status === 'REJECTED') {
+              await transaction.reportFieldFinding.updateMany({
+                where: { reportId: current.id, status: 'PENDING_REVIEW' },
+                data: { status: 'REVIEWED', reviewedAt: now, reviewedByAdminId: scope.adminId },
+              });
+            }
           }
           const row = await transaction.report.findFirst({ where: { ...where, id: current.id }, select: detailSelect });
           if (!row) throw missing();

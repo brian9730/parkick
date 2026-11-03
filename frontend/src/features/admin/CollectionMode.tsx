@@ -1,7 +1,7 @@
 import { ArrowUpRight, LocateFixed, MapPin, Map as MapIcon, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { adminApi } from '../../api/admin';
+import { collectionApi } from '../../api/admin';
 import type { NearbyReport } from '../../api/admin';
 import { Button, EmptyState, ErrorState, LoadingState, StatusBadge } from '../../components/ui';
 import { isValidCoordinates } from '../map/location';
@@ -51,9 +51,9 @@ function movedMeters(from: CurrentLocation, to: CurrentLocation): number {
 }
 
 function collectionReturnTo(page: number, publicId: string): string {
-  const params = new URLSearchParams({ mode: 'collect', focus: publicId });
+  const params = new URLSearchParams({ focus: publicId });
   if (page > 1) params.set('page', String(page));
-  return `/admin/dashboard?${params.toString()}`;
+  return `/collect?${params.toString()}`;
 }
 
 function CollectionReports({ location, refreshKey, page, focusedPublicId, onPageChange, onFocusChange }: {
@@ -69,7 +69,7 @@ function CollectionReports({ location, refreshKey, page, focusedPublicId, onPage
   const listRef = useRef<HTMLOListElement>(null);
   const scrollToMap = useRef(false);
   const scrollRestored = useRef(false);
-  const loader = useCallback((signal: AbortSignal) => adminApi.nearbyReports({
+  const loader = useCallback((signal: AbortSignal) => collectionApi.nearbyReports({
     latitude: location.latitude, longitude: location.longitude, page, pageSize,
   }, signal), [location, page]);
   const { data, loading, error, reload } = useAdminData(loader);
@@ -161,7 +161,7 @@ function CollectionReports({ location, refreshKey, page, focusedPublicId, onPage
                   </span>
                 </button>
                 <div className="collection-report-actions">
-                  <Link className="collection-report-detail" to={`/admin/reports/${encodeURIComponent(report.publicId)}?from=collection&returnTo=${encodeURIComponent(collectionReturnTo(page, report.publicId))}`} state={{ collectionReturnTo: collectionReturnTo(page, report.publicId) }} onClick={() => rememberScroll(report.publicId)}>신고 상세 보기<ArrowUpRight size={15} aria-hidden="true" /></Link>
+                  <Link className="collection-report-detail" to={`/collect/reports/${encodeURIComponent(report.publicId)}?returnTo=${encodeURIComponent(collectionReturnTo(page, report.publicId))}`} state={{ collectionReturnTo: collectionReturnTo(page, report.publicId) }} onClick={() => rememberScroll(report.publicId)}>신고 상세 보기<ArrowUpRight size={15} aria-hidden="true" /></Link>
                   <NaverRouteButtons latitude={report.latitude} longitude={report.longitude} destinationName={report.address || `${report.operatorName} ${report.deviceId}`} />
                 </div>
               </li>)}
@@ -172,7 +172,7 @@ function CollectionReports({ location, refreshKey, page, focusedPublicId, onPage
     </section>
     {showMap && <section ref={mapPanelRef} className="dashboard-panel collection-map-panel" aria-label="수거 대상 신고 지도">
       <div className="panel-heading"><div><h2>신고 위치 지도</h2><p>파란 점은 현재 위치, 숫자 표시는 근처에 모인 신고 건수입니다.</p></div>{compact && <button type="button" className="collection-map-close" onClick={() => setMapOpen(false)} aria-label="지도 접기"><X size={18} /></button>}</div>
-      <AdminNaverReportMap reports={reports} currentLocation={location} focusRequest={selectedRequest} />
+      <AdminNaverReportMap reports={reports} currentLocation={location} focusRequest={selectedRequest} detailBasePath="/collect/reports" collectionPage={page} />
       <p className="collection-map-caption">현재 페이지의 {reports.length.toLocaleString('ko-KR')}건을 지도에 표시합니다. 목록 항목을 누르면 해당 신고의 위치와 정보를 볼 수 있습니다.</p>
     </section>}
   </div>;

@@ -74,7 +74,7 @@ test('mobile wizard enforces required evidence and keeps data through back navig
   await next(page);
   const photoGuidance = page.locator('.photo-guidance');
   await expect(photoGuidance).toContainText('현장사진을 촬영해 주세요.');
-  await expect(photoGuidance).toContainText('3미터 떨어진 위치에서 신고 대상 기기 전체가 보이도록 촬영해 주세요.');
+  await expect(photoGuidance).toContainText('기기가 화면 안에서 충분히 크게, 전체가 잘리지 않게 촬영해 주세요.');
   await expect(photoGuidance).toContainText('행인 얼굴이나 제3자 차량번호판 등 개인정보가 찍히지 않도록 주의해 주세요.');
   await expect(photoGuidance).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole('button', { name: '갤러리에서 선택', exact: true })).toBeInViewport({ ratio: 1 });

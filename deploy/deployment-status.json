@@ -1,19 +1,76 @@
 {
-  "checkedOn": "2026-10-25",
+  "checkedOn": "2026-11-03",
   "currentRelease": {
-    "path": "/srv/parkick/releases/20261025-collection-field-1",
+    "path": "/srv/parkick/releases/20261103-staff-roles-1",
     "applicationLink": "/srv/parkick/app",
-    "previousRelease": "/srv/parkick/releases/20261025-admin-rejected-1",
+    "previousRelease": "/srv/parkick/releases/20261025-hotspot-circles-1",
     "health": "ok; photoValidation=litellm; storage=private-s3",
     "rejectionVerification": "Live HTTPS browser confirmed management rejection count and detail rejection action using intercepted API responses; production database reads confirmed dashboard and rejected filter; no report rows were changed by verification",
     "navigationVerification": "Live HTTPS browser confirmed desktop top navigation, management/collection mode switch, responsive widths and mobile drawer without page errors; production API remained healthy",
     "collectionListFocusVerification": "Live HTTPS browser confirmed list selection opens the matching map information window on desktop and scrolls the map into view on mobile; actual NAVER tiles loaded and no page errors occurred",
-    "collectionFieldVerification": "Live HTTPS mobile browser with all admin API calls intercepted: 4/4 checks passed for list-first map toggle, detail return, evidence/action order, rejection reason, completion return and moving-location watch cleanup; no production report writes"
+    "collectionFieldVerification": "Live HTTPS mobile browser with all admin API calls intercepted: 4/4 checks passed for list-first map toggle, detail return, evidence/action order, rejection reason, completion return and moving-location watch cleanup; no production report writes",
+    "livePhotoGuidanceVerification": "Live HTTPS endpoint returned no_vehicle for a synthetic red JPEG; live mobile browser with a fake camera showed one AI guidance result, no page errors and no report submission",
+    "chatbotVerification": "External HTTPS /api/chat returned gateway mode and an answer; live mobile Chrome opened the public widget, displayed a freeform answer and had no page errors",
+    "hotspotVerification": "Circle-only release passed frontend 16/16 tests, lint and Linux build; HTTPS admin page and API health returned 200; live HTTPS browser mock confirmed red/yellow circles without hotspot number badges, working toggle and preserved report markers with no page errors or production data writes",
+    "staffRoleVerification": "Release built on Linux and backend unit tests passed 192/192. Production backup verified before two Prisma migrations; collector1@parkick.com issued as COLLECTOR without changing the existing manager. Live HTTPS collector login and collection map returned 200, manager dashboard returned 403, logout returned 204. No report status was changed."
+  },
+  "staffRoleDeployment": {
+    "release": "/srv/parkick/releases/20261103-staff-roles-1",
+    "previousRelease": "/srv/parkick/releases/20261025-hotspot-circles-1",
+    "status": "active on EC2",
+    "sourceArchiveSha256": "ee348bed25966b0f6849a516ade7086b2476b60453cc02aa517265e8b7fdc807",
+    "databaseMigrations": ["20261103000000_collector_role", "20261103000001_field_findings"],
+    "backupPath": "/var/backups/parkick/staff-roles-20261103-1",
+    "collectorAccount": "collector1@parkick.com",
+    "validation": "Local build, lint and 192 backend tests passed; Linux backend build and 192 tests passed; live health and /collect 200, unauthenticated collection API 401, collector login and collection map 200, manager dashboard 403, logout 204",
+    "productionReportsModifiedByVerification": 0
+  },
+  "hotspotCircleOnlyDeployment": {
+    "release": "/srv/parkick/releases/20261025-hotspot-circles-1",
+    "previousRelease": "/srv/parkick/releases/20261025-admin-hotspots-1",
+    "status": "previous release retained for rollback",
+    "change": "Remove the separate numeric badge markers over focus and interest zones; keep colored circles, existing report-count markers, toggle and panel zone counts",
+    "sourceArchiveSha256": "9377c503f5419811aa3fdd19983a2e15e5a3b230012b769803ca85aceb4b065a",
+    "validation": "EC2 frontend lint, 16/16 unit tests and Linux build passed; HTTPS admin page and API health returned 200; live HTTPS browser mock confirmed no hotspot badges, two colored circles, unchanged report markers and a working toggle without page errors",
+    "databaseMigration": false,
+    "testReportsCreatedInProduction": 0
+  },
+  "adminHotspotDeployment": {
+    "release": "/srv/parkick/releases/20261025-admin-hotspots-1",
+    "previousRelease": "/srv/parkick/releases/20261025-chatbot-1",
+    "status": "previous release retained for rollback",
+    "change": "Management dashboard map marks 5+ nearby reports as red focus zones and 3-4 as yellow interest zones, with an on/off toggle; groups reports within 150 metres using all reports matching the current filters",
+    "sourceArchiveSha256": "c5e1d36a9e4aec163d3028a920896bb34b69abe1998f1316ec45a10c6e56f5ee",
+    "validation": "EC2 frontend 16/16 and backend 184/184 tests, lint and full Linux build passed; HTTPS admin page and API health returned 200; read-only production DB query matched 14 map reports and yielded one hotspot zone; live HTTPS browser mock passed red/yellow display and on/off toggle without map reset or page errors",
+    "databaseMigration": false,
+    "testReportsCreatedInProduction": 0
+  },
+  "chatbotDeployment": {
+    "release": "/srv/parkick/releases/20261025-chatbot-1",
+    "previousRelease": "/srv/parkick/releases/20261025-live-photo-guidance-1",
+    "status": "previous release retained for rollback; frontend 16/16 and backend 180/180 tests, lint and full Linux build passed",
+    "sourceArchiveSha256": "c0fafd0c7b6a811eda2d9e108eb5d6b3ff8026d4768c5017126a33fc116dfabe",
+    "runtime": "CHATBOT_PROVIDER=gateway; existing private LiteLLM key reused server-side; photoValidation=litellm; storage=private-s3",
+    "externalCheck": "HTTPS /api/chat returned HTTP 200, gateway mode and a nonempty answer; mobile Chrome public widget opened, answered and had zero page errors",
+    "databaseMigration": false,
+    "testReportsCreatedInProduction": 0
+  },
+  "livePhotoGuidanceDeployment": {
+    "release": "/srv/parkick/releases/20261025-live-photo-guidance-1",
+    "previousRelease": "/srv/parkick/releases/20261025-collection-field-1",
+    "status": "active on EC2; workspace lint and build, frontend 16/16 and backend 164/164 tests, API readiness, live HTTPS guidance and fake-camera mobile browser checks passed",
+    "change": "During camera capture, periodically analyze a reduced JPEG frame for shared PM visibility and give framing guidance; retain final photo validation and camera/gallery fallback",
+    "sourceArchiveSha256": "8ea1a7298deadb996b3623bf76f763df102d23bcadd8e571c29bc2b76736000a",
+    "runtime": "AI_PROVIDER=litellm (proxy to Bedrock); REPORT_STORAGE_PROVIDER=s3",
+    "liveApiCheck": "One synthetic red JPEG returned HTTP 200 with no_vehicle in 1.46 seconds",
+    "liveBrowserCheck": "390x844 Chrome fake camera showed no_vehicle after one guidance request; zero page errors and zero report submissions",
+    "databaseMigration": false,
+    "testReportsCreatedInProduction": 0
   },
   "collectionFieldDeployment": {
     "release": "/srv/parkick/releases/20261025-collection-field-1",
     "previousRelease": "/srv/parkick/releases/20261025-admin-rejected-1",
-    "status": "active on EC2; frontend lint, production build, 16 unit tests, API readiness and 4 live HTTPS mocked mobile browser checks passed",
+    "status": "historical release retained for rollback; frontend lint, production build, 16 unit tests, API readiness and 4 live HTTPS mocked mobile browser checks passed",
     "change": "Mobile collection queue shows nearest reports first with an on-demand map, preserves queue page/focus/scroll after detail and status updates, links walking/driving to NAVER Maps app, refreshes GPS while collection mode is visible, places photos before field actions, offers optional QR recheck, and requires a public reason when rejecting a missing device",
     "sourceArchiveSha256": "63d8ed3341e8bfa2a94461a6029111df0595819f35d28458be6128695f6b6726",
     "backendAndDatabase": "unchanged; old release preserved for code rollback",

@@ -1,9 +1,4 @@
 .dashboard-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
-.dashboard-mode-switch { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid #d6e0ec; border-radius: 10px; background: #fff; }
-.dashboard-mode-switch button { min-height: 32px; padding: 5px 12px; border: 0; border-radius: 7px; background: transparent; color: #47627d; font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
-.dashboard-mode-switch button.active { background: #075fc8; color: #fff; box-shadow: 0 1px 3px #1649802b; }
-.dashboard-mode-switch button:not(.active):hover { background: #edf4fc; }
-.dashboard-mode-switch button:focus-visible { outline: 2px solid #075fc8; outline-offset: 2px; }
 .collection-mode { min-width: 0; }
 .collection-location-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; padding: 11px 14px; border: 1px solid #dbe7f3; border-radius: 10px; background: #f6f9fd; }
 .collection-location-bar > div { display: flex; align-items: center; gap: 9px; min-width: 0; color: #1d6ac4; }
@@ -59,8 +54,6 @@
 @media (max-width: 600px) {
   .admin-dashboard-page .admin-page-heading { align-items: flex-start; flex-wrap: wrap; }
   .dashboard-heading-actions { justify-content: space-between; width: 100%; }
-  .dashboard-mode-switch { flex: 1 1 auto; }
-  .dashboard-mode-switch button { flex: 1 1 auto; min-height: 44px; padding: 8px 7px; }
   .collection-location-bar { align-items: flex-start; flex-direction: column; }
   .collection-location-bar .button { align-self: flex-end; min-height: 44px; }
   .collection-list-heading { align-items: center; gap: 8px; }

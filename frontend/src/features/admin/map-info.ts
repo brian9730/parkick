@@ -11,7 +11,7 @@ function element<Tag extends keyof HTMLElementTagNameMap>(tag: Tag, className: s
 }
 
 /** Report content is untrusted: never insert it as HTML, including in SDK overlays. */
-export function createReportMapInfo(reports: AdminMapReport[], close: () => void): HTMLElement {
+export function createReportMapInfo(reports: AdminMapReport[], close: () => void, detailBasePath = '/admin/reports', collectionPage = 1): HTMLElement {
   const root = element('section', 'admin-map-info');
   root.setAttribute('aria-label', '선택한 위치의 신고 정보');
   const heading = element('div', 'admin-map-info-heading');
@@ -29,13 +29,19 @@ export function createReportMapInfo(reports: AdminMapReport[], close: () => void
     const status = mapStatusLabels[report.status];
     const completion = adminCompletionLabel(report.completionMethod);
     card.append(element('span', `admin-map-status status-${report.status.toLowerCase()}`, completion ? `${status} · ${completion}` : status));
+    if (report.hasPendingFieldFinding) card.append(element('span', 'field-finding-badge', '현장 미발견 · 검토 대기'));
     card.append(element('p', 'admin-map-info-device', `${report.operatorName || '업체 미확인'} · ${report.deviceId || '기기번호 없음'}`));
     card.append(element('p', 'admin-map-info-address', report.address || `위도 ${report.latitude.toFixed(6)} · 경도 ${report.longitude.toFixed(6)}`));
     const time = element('time', '', `접수 ${formatAdminDate(report.createdAt)}`);
     time.dateTime = report.createdAt;
     card.append(time);
     const link = element('a', 'admin-map-info-link', '신고 상세 보기');
-    link.href = `/admin/reports/${encodeURIComponent(report.publicId)}`;
+    const detailPath = `${detailBasePath}/${encodeURIComponent(report.publicId)}`;
+    if (detailBasePath === '/collect/reports') {
+      const returnTo = new URLSearchParams({ focus: report.publicId });
+      if (collectionPage > 1) returnTo.set('page', String(collectionPage));
+      link.href = `${detailPath}?returnTo=${encodeURIComponent(`/collect?${returnTo}`)}`;
+    } else link.href = detailPath;
     link.setAttribute('aria-label', `${report.publicId} 신고 상세 보기`);
     card.append(link);
     list.append(card);

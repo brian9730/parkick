@@ -125,7 +125,7 @@ test('collection map fits current position with five nearest reports and keeps a
   let activeReports = reports;
   await page.route('http://localhost:5188/api/**', route => route.abort());
   await page.route('**/api/admin/auth/me', route => route.fulfill({ json: { data: {
-    admin: { id: 'admin-test', email: 'collector@example.invalid', name: '수거 담당자', role: 'PLATFORM_ADMIN', tenantId: null },
+    admin: { id: 'collector-test', email: 'collector@example.invalid', name: '수거 담당자', role: 'COLLECTOR', tenantId: 'tenant-test' },
     mode: 'database',
   } } }));
   await page.route('**/api/admin/dashboard', route => route.fulfill({ json: { data: {
@@ -134,12 +134,11 @@ test('collection map fits current position with five nearest reports and keeps a
   await page.route('**/api/admin/reports/map**', route => route.fulfill({ json: { data: {
     mode: 'database', items: [], total: 0, page: 1, pageSize: 200,
   } } }));
-  await page.route('**/api/admin/reports/nearby**', route => route.fulfill({ json: { data: {
+  await page.route('**/api/admin/collection/reports/nearby**', route => route.fulfill({ json: { data: {
     mode: 'database', items: activeReports, total: activeReports.length, page: 1, pageSize: 50,
   } } }));
 
-  await page.goto('/admin/dashboard');
-  await page.getByRole('button', { name: '수거 모드', exact: true }).click();
+  await page.goto('/collect');
   await expect(page.getByRole('button', { name: '현재 위치와 가까운 신고 보기' })).toBeVisible();
   await expect(page.getByRole('img', { name: '현재 위치' })).toBeVisible();
   expect(await page.evaluate(() => window.__collectionMapMock.maps.at(-1))).toMatchObject({
@@ -166,8 +165,7 @@ test('collection map fits current position with five nearest reports and keeps a
   await expect(page.getByRole('region', { name: '거리순 수거 대상 신고 목록' }).getByRole('link', { name: '신고 상세 보기' })).toHaveCount(reports.length);
 
   activeReports = [];
-  await page.getByRole('button', { name: '관리 모드', exact: true }).click();
-  await page.getByRole('button', { name: '수거 모드', exact: true }).click();
+  await page.reload();
   await expect(page.getByRole('button', { name: '현재 위치로 이동' })).toBeVisible();
   await expect(page.getByRole('img', { name: '현재 위치' })).toBeVisible();
   expect(await page.evaluate(() => window.__collectionMapMock.maps.at(-1))).toMatchObject({

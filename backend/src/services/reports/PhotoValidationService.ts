@@ -35,7 +35,7 @@ function unavailable(): ApiError { return new ApiError(503, 'PHOTO_VALIDATION_UN
 function invalidPhoto(): ApiError { return new ApiError(422, 'PHOTO_NOT_PM', NOT_PM); }
 
 /** Converse image blocks are limited to 3.75 MB and 8000 px; evidence can be larger. */
-async function modelImage(buffer: Buffer): Promise<Uint8Array> {
+export async function modelImage(buffer: Buffer): Promise<Uint8Array> {
   const resized = await sharp(buffer, { limitInputPixels: 40_000_000 })
     .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: 72, mozjpeg: true })

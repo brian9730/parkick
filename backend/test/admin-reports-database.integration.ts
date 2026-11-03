@@ -156,7 +156,7 @@ describe('PostgreSQL administrator report management and tenant isolation', () =
     assert.ok(page.items[1].distanceMeters >= 33 && page.items[1].distanceMeters <= 34);
     assert.ok(page.items[2].distanceMeters >= 111 && page.items[2].distanceMeters <= 112);
     const allowed = ['publicId', 'createdAt', 'updatedAt', 'status', 'completionMethod', 'completedAt', 'operatorName',
-      'deviceId', 'address', 'categories', 'tenant', 'region', 'latitude', 'longitude', 'distanceMeters'].sort();
+      'deviceId', 'address', 'categories', 'tenant', 'region', 'latitude', 'longitude', 'distanceMeters', 'hasPendingFieldFinding'].sort();
     assert.deepEqual(Object.keys(page.items[0]).sort(), allowed);
     for (const secret of [phone, 'contactPhoneMasked', 'contactPhoneCipher', 'qrRawData', 'finalReportText', 'images', 'internalNote']) {
       assert.equal(JSON.stringify(page).includes(secret), false);
@@ -191,7 +191,7 @@ describe('PostgreSQL administrator report management and tenant isolation', () =
     assert.equal(first.items[0].latitude, 37.123456); assert.equal(first.items[0].longitude, 127.123456);
     assert.equal(second.total, 1); assert.equal(second.items[0].publicId, f.publicIds[1]);
     assert.equal(second.items[0].latitude, 35.179554); assert.equal(second.items[0].longitude, 129.075642);
-    const allowed = ['publicId', 'createdAt', 'updatedAt', 'status', 'completionMethod', 'completedAt', 'operatorName', 'deviceId', 'address', 'categories', 'tenant', 'region', 'latitude', 'longitude'].sort();
+    const allowed = ['publicId', 'createdAt', 'updatedAt', 'status', 'completionMethod', 'completedAt', 'operatorName', 'deviceId', 'address', 'categories', 'tenant', 'region', 'latitude', 'longitude', 'hasPendingFieldFinding'].sort();
     assert.deepEqual(Object.keys(first.items[0]).sort(), allowed);
     for (const secret of [phone, 'contactPhoneMasked', 'phoneIdentifier', 'contactPhoneCipher', 'qrRawData', 'finalReportText', 'userDescription', 'images', 'objectKey', 'history', 'internalNote', 'PRIVATE_QR_SENTINEL']) {
       assert.equal(JSON.stringify(platform.body).includes(secret), false);

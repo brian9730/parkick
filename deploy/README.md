@@ -1,10 +1,20 @@
 # EC2 웹·API·PostgreSQL과 비공개 S3 사진 배포
 
+2026-11-03 `20261103-staff-roles-1`을 EC2에 배포했습니다. 관리자 화면과 수거 담당자 화면을 계정 역할별로 분리하고, 수거 화면을 `/collect`로 이동했습니다. 수거 담당자는 현장에 기기가 없으면 사유를 기록하고 관리자가 최종 반려할 수 있습니다. 운영 DB에 수거 역할·현장 기록 마이그레이션 2개를 적용하기 전 `/var/backups/parkick/staff-roles-20261103-1`에 DB·환경 설정·로컬 사진을 백업해 검증했습니다. 기존 관리자 계정은 변경하지 않고 `collector1@parkick.com`을 `COLLECTOR`로 발급했습니다. 로컬·Linux 빌드와 테스트 192건이 통과했고 실제 HTTPS에서 수거 계정 로그인·수거 지도 200, 관리자 대시보드 403, 로그아웃 204를 확인했습니다. 새 신고 제출이나 운영 신고의 상태 변경은 하지 않았습니다.
+
+2026-10-25 `20261025-hotspot-circles-1`을 EC2에 배포했습니다. 관리 모드 지도의 빨강·노랑 구역 원은 유지하고 중앙의 중복 숫자 배지만 제거했습니다. 기존 신고 건수 마커, 구역 표시 토글, 패널의 구역 수는 그대로입니다. EC2 프런트엔드 lint·16개 테스트·Linux 빌드와 실제 HTTPS 화면의 대역 API 브라우저 검증을 통과했습니다. 운영 DB·S3·환경 설정은 변경하지 않았으며 이전 `20261025-admin-hotspots-1`은 복구용으로 보존했습니다.
+
+2026-10-25 `20261025-admin-hotspots-1`을 EC2에 배포했습니다. 관리 모드 지도에서 150m 이내의 신고를 묶어 5건 이상은 빨간 집중 구역, 3~4건은 노란 관심 구역으로 표시하고 토글로 켜고 끌 수 있습니다. 기존 `20261025-chatbot-1`은 복구용으로 보존했습니다. EC2에서 프런트엔드 16개·백엔드 184개 테스트와 lint·Linux 빌드가 통과했고, HTTPS 관리자 화면·API 상태와 운영 PostgreSQL 읽기 전용 집계를 확인했습니다. 당시 전체 신고 14건에서 집중·관심 구역은 총 1곳이었습니다. DB 마이그레이션이나 신고 데이터 변경은 없었습니다.
+
+2026-10-25 `20261025-chatbot-1`을 EC2에 배포했습니다. 기존 서버의 비공개 LiteLLM 주소·키를 `CHATBOT_*` 설정에 재사용했고 공개 홈에 안내 챗봇을 추가했습니다. 새 릴리스에서 프런트엔드 16개·백엔드 180개 테스트와 lint·Linux 빌드가 통과했습니다. 외부 HTTPS `POST /api/chat`은 `gateway` 모드와 답변을 반환했고, 모바일 Chrome에서 위젯 열기·자유 질문 응답·페이지 오류 0건을 확인했습니다. 이전 릴리스와 환경파일 백업은 보존했으며 시험 신고, DB 마이그레이션, S3 사진 변경은 없었습니다.
+
+이전 `20261025-live-photo-guidance-1`에서는 촬영 중 AI 안내를 추가했습니다. 당시 외부 HTTPS API에서 합성된 무관한 사진은 약 1.46초에 `no_vehicle`로 응답했고, 가상 카메라를 사용하는 모바일 브라우저에서 안내 표시와 카메라 종료를 확인했습니다. 사진 AI 경로는 LiteLLM 프록시를 통한 Bedrock 호출입니다. 실기기 카메라와 실제 현장 사진의 안내 품질은 추가 검증이 필요합니다.
+
 2026-10-23 현재 `SafeInstanceProfile-sgu-202686`을 운영 EC2에 연결했고, EC2의 `parkick` 서비스 계정에서 S3 임시 객체 쓰기·읽기·삭제를 확인했습니다. 운영 API는 `REPORT_STORAGE_PROVIDER=s3`, 사진 판별은 `AI_PROVIDER=litellm`입니다. 기존 신고 사진 6장(총 12,195,775바이트)은 S3로 이전하고 DB 경로를 변경했으며, 이전 후 6장 모두 S3 조회 검증을 통과했습니다. EC2 로컬 원본은 복구를 위해 보존합니다. 내부 LiteLLM 프록시의 HTTPS 접속·모델 목록과 실제 Parkick 사진 사전 검사에서 관련 사진 허용·무관 사진 거부를 확인했습니다. [역할 및 AI 연동 안내](iam-admin-setup.md)를 참조하세요.
 
 Ubuntu EC2 한 대에서 Nginx, Node.js 22, PostgreSQL을 실행하고 신고 사진은 서울 리전의 비공개 S3 버킷에 저장합니다. Nginx가 HTTPS와 React 정적 파일을 제공하고 `/api/`를 `127.0.0.1:4000`으로 전달합니다. EC2의 `/var/lib/parkick/reports`에는 이전한 사진의 복구용 원본을 보존하며 정적 웹 경로에 포함하지 않습니다. S3 접근에는 연결된 EC2 인스턴스 프로필의 임시 자격증명을 사용합니다.
 
-**운영 EC2는 현재 `20261025-collection-field-1` 릴리스입니다.** 주소는 **[https://15.165.235.154](https://15.165.235.154)**입니다. `/api/health`는 사진 판별 `litellm`과 사진 저장 `private-s3`를, `/api/reports/status`는 접수 `available=true`·저장 `s3`를 반환합니다. `/api/health.services.ai`의 `disabled`는 사용하지 않는 이전 텍스트 신고문 생성기를 가리키며 현장 사진 판별 상태는 `photoValidation`에서 확인합니다. 외부 HTTPS `POST /api/reports/validate-photos`에서 공개 공유 킥보드 사진은 200·`valid=true`, 생성한 무관한 빨간 JPEG는 422·`PHOTO_NOT_PM`이었습니다. 시험 신고는 생성하지 않았습니다. S3 역할의 임시 객체 작업과 기존 사진 6장의 이전·조회는 이전 릴리스에서 확인했습니다. 운영 관리자·시민 브라우저의 이전 사진 표시와 신규 신고 전체 흐름은 아직 별도 검증이 필요합니다.
+**운영 EC2는 현재 `20261103-staff-roles-1` 릴리스입니다.** 주소는 **[https://15.165.235.154](https://15.165.235.154)**입니다. `/api/health`는 사진 판별 `litellm`과 사진 저장 `private-s3`를, `/api/reports/status`는 접수 `available=true`·저장 `s3`를 반환합니다. `/api/health.services.ai`의 `disabled`는 사용하지 않는 이전 텍스트 신고문 생성기를 가리키며 현장 사진 판별 상태는 `photoValidation`에서 확인합니다. 챗봇은 별도의 `CHATBOT_PROVIDER=gateway` 설정으로 연결했고 실제 HTTPS 자유 질문 응답을 확인했습니다. 이전 릴리스에서 외부 HTTPS `POST /api/reports/validate-photos`는 공유 킥보드 사진 200·`valid=true`, 무관한 빨간 JPEG 422·`PHOTO_NOT_PM`이었습니다. S3 역할의 임시 객체 작업과 기존 사진 6장의 이전·조회도 이전 릴리스에서 확인했습니다. 운영 관리자·시민 브라우저의 이전 사진 표시와 신규 신고 전체 흐름은 아직 별도 검증이 필요합니다.
 
 2026-10-25 관리자 대시보드에 **관리 모드 / 수거 모드** 전환을 추가하고 EC2에 배포했습니다. 수거 모드는 기기 GPS로 현재 위치를 확인해 네이버 지도와 미완료 신고 목록을 표시합니다. 목록은 현재 위치에서 직선거리 가까운 순으로 정렬하며 업체·기기번호·위치·신고유형·거리를 보여줍니다. EC2에서 프런트엔드·백엔드 lint와 빌드가 통과했고, 운영 PostgreSQL 읽기 전용 조회에서 미완료 신고 8건의 거리순 정렬을 확인했습니다. 비로그인 API는 401이었고 실제 HTTPS 화면에서는 관리자 API만 대역한 브라우저 테스트 2개와 네이버 지도 타일·신고 마커·현재 위치 마커 표시가 통과했습니다. 테스트 신고나 DB 변경은 없었습니다.
 
@@ -56,7 +66,7 @@ Ubuntu EC2 한 대에서 Nginx, Node.js 22, PostgreSQL을 실행하고 신고 �
 | 외부 API 검증 | 6개 통과: health/API, SPA 3개 경로·JS 번들, HTTP→HTTPS, 전화번호 없는 테스트 신고 201·재전송 200, 공개 신고 사진 API 404 |
 | 모바일 Chrome | 390×844에서 secure context·홈 이미지·직접 입력→사진 단계·직접 주소 새로고침·런타임 오류 없음, 5개 통과 |
 | 실제 저장·정리 | 테스트 신고의 DB 관계·JPEG 해시·EXIF 제거·파일 권한·실제 사진 경로의 비공개 접근 검증 통과; 생성한 테스트 신고·관계 데이터·사진 1개만 정리 완료 |
-| 현재 배포 릴리스 | `/srv/parkick/app` → `/srv/parkick/releases/20261025-admin-rejected-1`; 관리 모드에 반려 집계·실제 반려 처리 추가, 기존 PC 상단 메뉴·모바일 햄버거·수거 모드 유지, 이전 `20261025-admin-top-nav-1` 보존 |
+| 현재 배포 릴리스 | `/srv/parkick/app` → `/srv/parkick/releases/20261103-staff-roles-1`; 관리자·수거 역할 분리 및 수거 계정 발급, 이전 `20261025-hotspot-circles-1` 보존 |
 | Phase 5 과거 배포 검증 | 당시 실제 HTTPS 모바일 390px의 6단계 신고→201→완료 영수증→번호 목록 200·no-store→상세 처리 이력 통과; 새 5단계의 검증 결과가 아님 |
 | Phase 5 운영 테스트 자료 | 테스트 2건의 표식·UUID·접수번호·내용·해시 일치를 확인하고 해당 DB 관계·사진만 정리 완료; 기존 사용자 데이터 유지 |
 | 관리자 인증 검증 | 지정 플랫폼 관리자 등록 후 2026-10-15 23:31:34 KST(14:31:34 UTC)에 실제 로그인·새로고침·로그아웃과 기존 토큰 무효화 통과; production·개발 Mock 비활성화·기존 DB·사진·전화번호 키 유지 |
@@ -314,7 +324,7 @@ Phase 5에는 `POST /api/reports/lookup`과 `POST /api/reports/lookup/:publicId`
 
 `/`, `/report`를 직접 열고 새로고침했을 때 SPA가 동작하는지, 모바일 HTTPS에서 카메라·위치 권한을 사용할 수 있는지 확인합니다. 관리자 인증은 등록한 운영 계정의 로그인·새로고침 시 세션 복원·로그아웃 후 접근 거부를 확인합니다. 개발 `DEV_ADMIN_*` 계정은 운영 성공 조건으로 사용하지 않습니다. 현재 실제 EC2에서 DB 인증 모드와 쿠키 속성, 세션 복원·로그아웃 후 기존 토큰의 401 응답을 모두 확인했습니다.
 
-재배포는 `/etc/parkick/backend.env`, PostgreSQL 데이터, S3 객체와 `/var/lib/parkick/reports` 원본을 유지하고 `/srv/parkick/releases/릴리스명`에서 설치·운영 빌드를 준비한 뒤 `/srv/parkick/app` 연결 대상을 전환하고 API를 재시작하는 방식입니다. 현재 배포 대상은 `20261025-collection-field-1`이며 이전 대상 `20261025-admin-rejected-1`, `20261025-admin-top-nav-1`, `20261025-admin-list-focus-1`, `20261025-admin-sidebar-1`, `20261025-admin-collection-mode-1`, `20261024-admin-collect-area-1`, `20261024-mobile-steps-7`, `20261024-mobile-steps-6`, `20261024-mobile-steps-5`, `20261024-mobile-steps-4`, `20261024-mobile-steps-3`, `20261024-mobile-steps-2`, `20261024-mobile-steps-1`, `20261024-photo-two-1`, `20261024-report-title-1`, `20261023-photo-copy-1`, `20261023-litellm-photo-1`과 S3 호환 대상 `20261023-s3-hybrid-ready-1`을 보존했습니다. 2026-10-23 S3 이전 직전 백업은 `/var/backups/parkick/s3-cutover-20261023-1`에 검증해 두었습니다. DB 마이그레이션 전에는 DB·사진·전화번호 키를 복구할 수 있는 백업을 확보합니다. 새 S3 사진이 생긴 뒤 로컬 전용 릴리스로 돌아가면 사진을 읽지 못하므로 S3 호환 릴리스를 롤백 대상으로 사용합니다.
+재배포는 `/etc/parkick/backend.env`, PostgreSQL 데이터, S3 객체와 `/var/lib/parkick/reports` 원본을 유지하고 `/srv/parkick/releases/릴리스명`에서 설치·운영 빌드를 준비한 뒤 `/srv/parkick/app` 연결 대상을 전환하고 API를 재시작하는 방식입니다. 현재 배포 대상은 `20261103-staff-roles-1`이며 이전 대상 `20261025-hotspot-circles-1`, `20261025-admin-hotspots-1`, `20261025-chatbot-1`, `20261025-live-photo-guidance-1`, `20261025-collection-field-1`, `20261025-admin-rejected-1`, `20261025-admin-top-nav-1`, `20261025-admin-list-focus-1`, `20261025-admin-sidebar-1`, `20261025-admin-collection-mode-1`, `20261024-admin-collect-area-1`, `20261024-mobile-steps-7`, `20261024-mobile-steps-6`, `20261024-mobile-steps-5`, `20261024-mobile-steps-4`, `20261024-mobile-steps-3`, `20261024-mobile-steps-2`, `20261024-mobile-steps-1`, `20261024-photo-two-1`, `20261024-report-title-1`, `20261023-photo-copy-1`, `20261023-litellm-photo-1`과 S3 호환 대상 `20261023-s3-hybrid-ready-1`을 보존했습니다. 2026-10-23 S3 이전 직전 백업은 `/var/backups/parkick/s3-cutover-20261023-1`에 검증해 두었습니다. DB 마이그레이션 전에는 DB·사진·전화번호 키를 복구할 수 있는 백업을 확보합니다. 새 S3 사진이 생긴 뒤 로컬 전용 릴리스로 돌아가면 사진을 읽지 못하므로 S3 호환 릴리스를 롤백 대상으로 사용합니다.
 
 2026-10-23 `20261023-photo-copy-1`에서는 현장사진 단계의 안내 문구 세 곳만 삭제했습니다. 프런트엔드 lint·빌드·10개 테스트가 통과했고, 운영 모바일 크기 브라우저에서 사진 촬영·갤러리 버튼과 문구 제거를 확인했습니다. API health의 `photoValidation=litellm`, `storage=private-s3` 상태도 유지됩니다. 실제 신고 제출은 실행하지 않았습니다.
 

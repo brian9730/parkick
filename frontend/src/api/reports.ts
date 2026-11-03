@@ -34,6 +34,28 @@ export async function validateReportPhotos(photos: File[], signal: AbortSignal):
   if (result?.valid !== true) throw new ApiError('사진 검사 결과를 확인할 수 없습니다. 다시 시도해 주세요.', 0, 'INVALID_RESPONSE');
 }
 
+export type LivePhotoGuidanceStatus = 'ready' | 'move_closer' | 'center_subject' | 'show_full_vehicle' | 'no_vehicle' | 'uncertain';
+
+export interface LivePhotoGuidance {
+  status: LivePhotoGuidanceStatus;
+  message: string;
+}
+
+const livePhotoGuidanceStatuses: LivePhotoGuidanceStatus[] = [
+  'ready', 'move_closer', 'center_subject', 'show_full_vehicle', 'no_vehicle', 'uncertain',
+];
+
+/** A small camera frame is analyzed in memory. The captured evidence is added separately. */
+export async function getLivePhotoGuidance(frame: Blob, signal: AbortSignal): Promise<LivePhotoGuidance> {
+  const form = new FormData();
+  form.append('photo', frame, 'frame.jpg');
+  const result = await apiUpload<LivePhotoGuidance>('/reports/photo/live-guidance', form, { signal, timeoutMs: 20_000 });
+  if (!result || !livePhotoGuidanceStatuses.includes(result.status) || typeof result.message !== 'string') {
+    throw new ApiError('촬영 안내를 확인할 수 없어요.', 0, 'INVALID_RESPONSE');
+  }
+  return result;
+}
+
 export async function submitReport(input: ReportSubmissionInput, submissionId: string, photos: File[], signal: AbortSignal, onProgress?: (progress: UploadProgress) => void): Promise<ReportReceipt> {
   const form = new FormData();
   // Explicit allowlist: AI metadata and client-side routing/tenant fields never leave the browser.

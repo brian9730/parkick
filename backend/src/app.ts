@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { assertProductionReportConfig, type AppConfig } from './config.js';
 import { AdminAuthController } from './controllers/AdminAuthController.js';
 import { AdminOverviewController } from './controllers/AdminOverviewController.js';
+import { CollectionController } from './controllers/CollectionController.js';
 import { QRController } from './controllers/QRController.js';
 import { AIController } from './controllers/AIController.js';
 import { ReportController } from './controllers/ReportController.js';
@@ -16,6 +17,7 @@ import { qrRoutes } from './routes/qr.js';
 import { aiRoutes } from './routes/ai.js';
 import { reportRoutes } from './routes/reports.js';
 import { reportLookupRoutes } from './routes/reportLookup.js';
+import { chatRoutes } from './routes/chat.js';
 import { AdminAuthService } from './services/admin/AdminAuthService.js';
 import { AdminOverviewService } from './services/admin/AdminOverviewService.js';
 import { QRParsingService } from './services/qr/QRParsingService.js';
@@ -29,9 +31,12 @@ import { HybridEvidenceStorage } from './services/storage/HybridEvidenceStorage.
 import type { EvidenceStorage } from './services/storage/EvidenceStorage.js';
 import { ReportSubmissionService } from './services/reports/ReportSubmissionService.js';
 import { PhotoValidationService, type PhotoValidator } from './services/reports/PhotoValidationService.js';
+import { PhotoGuidanceService, type PhotoGuider } from './services/reports/PhotoGuidanceService.js';
 import type { LiteLlmSender } from './services/reports/LiteLlmPhotoClient.js';
 import { ReportLookupService } from './services/reports/ReportLookupService.js';
 import { PrismaReportLookupRepository } from './repositories/ReportLookupRepository.js';
+import { ChatService } from './services/chatbot/ChatService.js';
+import type { ChatFetch } from './services/chatbot/GatewayChatProvider.js';
 import type { ReportLookupRepository } from './repositories/ReportLookupRepository.js';
 import type { AdminAuthRepositories } from './repositories/PrismaAdminAuthRepository.js';
 import { PrismaAdminReportRepository, type AdminReportRepository } from './repositories/AdminReportRepository.js';
@@ -43,7 +48,9 @@ export interface AppOptions extends AIServiceOptions {
   adminAuthRepositories?: AdminAuthRepositories;
   adminReportRepository?: AdminReportRepository;
   photoValidator?: PhotoValidator;
+  photoGuider?: PhotoGuider;
   liteLlmSender?: LiteLlmSender;
+  chatFetch?: ChatFetch;
 }
 
 export async function createApp(config: AppConfig, options: AppOptions = {}) {
@@ -69,6 +76,7 @@ export async function createApp(config: AppConfig, options: AppOptions = {}) {
   // The old text endpoint is retained only for local compatibility. Production Bedrock is for evidence validation.
   const generator = config.environment === 'production' ? new ReportTextGenerator(null) : ReportTextGenerator.create(config, options);
   const photoValidator = options.photoValidator ?? PhotoValidationService.create(config, options.bedrockSender, options.timeoutMs, options.liteLlmSender);
+  const photoGuider = options.photoGuider ?? PhotoGuidanceService.create(config, options.bedrockSender, options.timeoutMs, options.liteLlmSender);
   const repository = config.reports ? options.reportRepository ?? new PrismaReportRepository(config.reports.databaseUrl) : null;
   const lookupRepository = config.reports ? options.reportLookupRepository ?? new PrismaReportLookupRepository(config.reports.databaseUrl) : null;
   const lookupService = config.reports && lookupRepository ? new ReportLookupService(config.reports.lookupKey, lookupRepository) : null;
@@ -89,12 +97,15 @@ export async function createApp(config: AppConfig, options: AppOptions = {}) {
   const auth = new AdminAuthController(authService, config);
   const adminReports = config.reports && authService.mode === 'database'
     ? options.adminReportRepository ?? new PrismaAdminReportRepository(config.reports.databaseUrl) : null;
-  const overview = new AdminOverviewController(new AdminOverviewService(new EmptyAdminOverviewRepository(), adminReports, storage));
-  app.use('/api/admin', adminRoutes(auth, overview));
+  const adminOverviewService = new AdminOverviewService(new EmptyAdminOverviewRepository(), adminReports, storage);
+  const overview = new AdminOverviewController(adminOverviewService);
+  const collection = new CollectionController(adminOverviewService);
+  app.use('/api/admin', adminRoutes(auth, overview, collection));
   app.use('/api/qr', qrRoutes(new QRController(new QRParsingService())));
   app.use('/api/ai', aiRoutes(new AIController(generator)));
+  app.use('/api/chat', chatRoutes(new ChatService(config.chatbot, { chatFetch: options.chatFetch })));
   app.use('/api/reports/lookup', reportLookupRoutes(new ReportLookupController(lookupService)));
-  app.use('/api/reports', reportRoutes(new ReportController(reportService, photoValidator, storageMode)));
+  app.use('/api/reports', reportRoutes(new ReportController(reportService, photoValidator, storageMode, photoGuider)));
   app.use(notFound);
   app.use(errorHandler);
   return Object.assign(app, { closeResources: async () => {

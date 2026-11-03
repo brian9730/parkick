@@ -162,6 +162,15 @@ async function prepareSdk(page: Page) {
       getPosition() { return this.position; }
       setMap(map: MapView | null) { this.attached = map !== null; if (map) map.element.append(this.element); else this.element.remove(); }
     }
+    class Circle {
+      readonly element = document.createElement('div');
+      constructor(options: { map: MapView; radius: number; fillColor: string }) {
+        this.element.dataset.testMapCircle = String(options.radius);
+        this.element.dataset.fillColor = options.fillColor;
+        this.setMap(options.map);
+      }
+      setMap(map: MapView | null) { if (map) map.element.prepend(this.element); else this.element.remove(); }
+    }
     class InfoWindow {
       readonly element = document.createElement('div');
       constructor(options: { content: HTMLElement | string }) { this.setContent(options.content); }
@@ -175,7 +184,7 @@ async function prepareSdk(page: Page) {
     }
     function installSdk() {
       const maps = {
-        LatLng, Map: MapView, Marker, InfoWindow,
+        LatLng, Map: MapView, Marker, Circle, InfoWindow,
         Point: class { constructor(readonly x: number, readonly y: number) {} },
         LatLngBounds: Bounds,
         Event: {
@@ -200,11 +209,42 @@ async function prepareSdk(page: Page) {
   return sdkRequests;
 }
 
+test('management map marks 3 nearby reports as an interest zone and toggles overlays without resetting the map', async ({ page }) => {
+  await prepareSdk(page);
+  await page.goto('/admin/login');
+  await page.getByLabel('이메일', { exact: true }).fill(email);
+  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '로그인', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/dashboard$/);
+  await page.getByLabel('지도 신고 검색', { exact: true }).fill(marker);
+  const response = page.waitForResponse(reply => reply.url().includes('/api/admin/reports/hotspots?') && new URL(reply.url()).searchParams.get('q') === marker);
+  await page.getByRole('button', { name: '검색', exact: true }).click();
+  expect((await response).status()).toBe(200);
+  const hotspot = await page.request.get(`/api/admin/reports/hotspots?q=${encodeURIComponent(marker)}`);
+  expect(hotspot.status()).toBe(200);
+  expect((await hotspot.json()).data.zones).toEqual([expect.objectContaining({ count: 3, level: 'yellow' })]);
+  const toggle = page.getByRole('switch', { name: '신고 집중 구역 표시' });
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('[data-test-map-circle]')).toHaveCount(1);
+  await expect(page.locator('.admin-hotspot-badge')).toHaveCount(0);
+  await expect(page.locator('.admin-hotspot-panel')).toContainText('관심 구역 1곳');
+  const destroyedBefore = await page.evaluate(() => window.__adminMapFixture.destroyedMaps);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(page.locator('[data-test-map-circle]')).toHaveCount(0);
+  await expect(page.locator('.admin-map-marker')).toHaveCount(2);
+  expect(await page.evaluate(() => window.__adminMapFixture.destroyedMaps)).toBe(destroyedBefore);
+  await toggle.click();
+  await expect(page.locator('[data-test-map-circle]')).toHaveCount(1);
+  await page.getByLabel('처리 상태', { exact: true }).selectOption('PROCESSING');
+  await expect(page.locator('[data-test-map-circle]')).toHaveCount(0);
+});
+
 async function loginAndSearch(page: Page) {
   await page.goto('/admin/login');
   await page.getByLabel('이메일', { exact: true }).fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill(password);
-  await page.getByRole('button', { name: '관리자 로그인', exact: true }).click();
+  await page.getByRole('button', { name: '로그인', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/dashboard$/);
   await page.goto('/admin/map');
   await expect(page.getByRole('heading', { name: '신고 지도', exact: true })).toBeVisible();

@@ -26,7 +26,7 @@ export function ReportTable({ reports, skeleton = false, filtered = false }: { r
         <td className="admin-address-cell">{report.address || '주소 미입력'}</td>
         <td><div className="admin-report-tags">{report.categories.map(category => <span key={category}>{category}</span>)}</div></td>
         <td><time dateTime={report.createdAt}>{formatAdminDate(report.createdAt)}</time></td>
-        <td><div className="admin-report-status"><StatusBadge status={report.status} />{report.completionMethod && <small>{adminCompletionLabel(report.completionMethod)}</small>}</div></td>
+        <td><div className="admin-report-status"><StatusBadge status={report.status} />{report.hasPendingFieldFinding && <span className="field-finding-badge">현장 미발견 · 검토 대기</span>}{report.completionMethod && <small>{adminCompletionLabel(report.completionMethod)}</small>}</div></td>
       </tr>)}</tbody>
   </table></div>;
 }

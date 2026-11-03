@@ -24,6 +24,7 @@ export interface NaverMarker {
   setPosition(position: NaverLatLng): void;
   setMap(map: NaverMap | null): void;
 }
+export interface NaverCircle { setMap(map: NaverMap | null): void }
 export type NaverMapEventListener = object;
 export interface NaverReverseGeocodeResponse {
   v2?: {
@@ -34,7 +35,8 @@ export interface NaverReverseGeocodeResponse {
 export interface NaverMaps {
   LatLng: new (latitude: number, longitude: number) => NaverLatLng;
   Map: new (container: HTMLElement, options: { center: NaverLatLng; zoom: number; keyboardShortcuts?: boolean }) => NaverMap;
-  Marker: new (options: { map: NaverMap; position: NaverLatLng; draggable: boolean; title: string; icon?: { content: HTMLElement; anchor: NaverPoint; size: { width: number; height: number } } }) => NaverMarker;
+  Marker: new (options: { map: NaverMap; position: NaverLatLng; draggable: boolean; title: string; clickable?: boolean; zIndex?: number; icon?: { content: HTMLElement; anchor: NaverPoint; size: { width: number; height: number } } }) => NaverMarker;
+  Circle?: new (options: { map: NaverMap; center: NaverLatLng; radius: number; fillColor: string; fillOpacity: number; strokeColor: string; strokeOpacity: number; strokeWeight: number; clickable: boolean }) => NaverCircle;
   Point?: new (x: number, y: number) => NaverPoint;
   LatLngBounds?: new (southWest: NaverLatLng, northEast: NaverLatLng) => NaverLatLngBounds;
   InfoWindow?: new (options: { content: HTMLElement; maxWidth: number; borderWidth: number; backgroundColor: string; disableAnchor: boolean }) => NaverInfoWindow;

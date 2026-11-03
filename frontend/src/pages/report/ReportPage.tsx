@@ -46,6 +46,7 @@ export function ReportPage() {
   const [qrBusy, setQrBusy] = useState(false);
   const [validationAttempted, setValidationAttempted] = useState(false);
   const [photoValidating, setPhotoValidating] = useState(false);
+  const [photoCameraActive, setPhotoCameraActive] = useState(false);
   const [photoValidation, setPhotoValidation] = useState<{ signature: string; valid: boolean; error: string } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -72,7 +73,7 @@ export function ReportPage() {
     setDraft(previous => ({ ...previous, phone, consent: phone ? previous.consent : false }));
   };
   const goTo = (next: number) => {
-    if (submission.submitting) return;
+    if (submission.submitting || photoCameraActive) return;
     submission.clearError();
     setStep(next); setValidationAttempted(false);
     requestAnimationFrame(() => {
@@ -82,6 +83,7 @@ export function ReportPage() {
     });
   };
   const nextStep = async () => {
+    if (photoCameraActive) return;
     if (validationError) {
       setValidationAttempted(true);
       requestAnimationFrame(() => errorRef.current?.focus());
@@ -147,7 +149,7 @@ export function ReportPage() {
     <div className="wizard-card" aria-busy={submission.submitting || photoValidating}><fieldset className="wizard-fields" disabled={submission.submitting} aria-label="신고 정보 입력">
       <div className="wizard-heading"><span className="step-kicker">STEP {String(step + 1).padStart(2, '0')} <span>/ {String(reportSteps.length).padStart(2, '0')}</span></span><h2 ref={headingRef} tabIndex={-1}>{headings[step]}</h2><p>{descriptions[step]}</p></div>
       {step === 0 && <DeviceStep draft={draft} onChange={changeDraft} onBusyChange={setQrBusy} showManualOnError={validationAttempted} />}
-      {step === 1 && <div className="wizard-content"><PhotoCapture evidence={evidence} validationBusy={photoValidating} validationMode={submission.status?.photoValidation} /><PrivacyHint />
+      {step === 1 && <div className="wizard-content"><PhotoCapture evidence={evidence} validationBusy={photoValidating} validationMode={submission.status?.photoValidation} onCameraActiveChange={setPhotoCameraActive} /><PrivacyHint />
         {submission.status?.photoValidation === 'mock'
           ? <p className="field-hint">개발용 모의 검사에서는 실제 사진 내용을 AI로 판별하지 않습니다.</p>
           : submission.status?.photoValidation === 'disabled'
@@ -188,8 +190,8 @@ export function ReportPage() {
       </div>}
       {validationAttempted && validationError && <div className="wizard-validation" role="alert" ref={errorRef} tabIndex={-1}>{validationError}</div>}
       <div className="wizard-actions">
-        {step > 0 && <Button variant="secondary" onClick={() => goTo(step - 1)} disabled={evidence.busy || photoValidating || submission.submitting}><ArrowLeft size={17} />이전</Button>}
-        {step < reportSteps.length - 1 ? <Button className="next-button" onClick={() => void nextStep()} disabled={qrBusy || evidence.busy || photoValidating}>{step === 3 ? '연락처 화면 보기' : '다음 단계'}{photoValidating ? <LoaderCircle size={18} className="spin" aria-hidden="true" /> : <ArrowRight size={18} />}</Button> : <Button className="next-button" onClick={() => void submit()} disabled={!!finalValidationError || evidence.busy || qrBusy || submission.submitting || !submission.status?.available || submission.status.mode === 'disabled'}>{submission.submitting ? <LoaderCircle size={17} className="spin" aria-hidden="true" /> : <Send size={17} aria-hidden="true" />}{submission.submitting ? '신고 제출 중…' : '신고 제출'}</Button>}
+        {step > 0 && <Button variant="secondary" onClick={() => goTo(step - 1)} disabled={evidence.busy || photoValidating || photoCameraActive || submission.submitting}><ArrowLeft size={17} />이전</Button>}
+        {step < reportSteps.length - 1 ? <Button className="next-button" onClick={() => void nextStep()} disabled={qrBusy || evidence.busy || photoValidating || photoCameraActive}>{step === 3 ? '연락처 화면 보기' : '다음 단계'}{photoValidating ? <LoaderCircle size={18} className="spin" aria-hidden="true" /> : <ArrowRight size={18} />}</Button> : <Button className="next-button" onClick={() => void submit()} disabled={!!finalValidationError || evidence.busy || qrBusy || submission.submitting || !submission.status?.available || submission.status.mode === 'disabled'}>{submission.submitting ? <LoaderCircle size={17} className="spin" aria-hidden="true" /> : <Send size={17} aria-hidden="true" />}{submission.submitting ? '신고 제출 중…' : '신고 제출'}</Button>}
       </div>
       <p className="wizard-bottom-note">{reportSteps[step]} · {step + 1} / {reportSteps.length} 단계</p></fieldset>
     </div><p className="flow-outro">작은 관심이 모두를 위한 길을 만들어요.</p>

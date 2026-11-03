@@ -24,6 +24,16 @@ enum ReportCompletionMethod {
 enum AdminRole {
   PLATFORM_ADMIN
   TENANT_ADMIN
+  COLLECTOR
+}
+
+enum FieldFindingType {
+  DEVICE_NOT_FOUND
+}
+
+enum FieldFindingStatus {
+  PENDING_REVIEW
+  REVIEWED
 }
 
 model Tenant {
@@ -63,13 +73,15 @@ model Admin {
   name             String                @db.VarChar(80)
   active           Boolean               @default(true)
   // Always explicit: never grant platform access through a default role.
-  // SQL CHECK requires a tenant for TENANT_ADMIN and no tenant for PLATFORM_ADMIN.
+  // SQL CHECK requires a tenant for TENANT_ADMIN and COLLECTOR; PLATFORM_ADMIN has none.
   // Actual request authorization is implemented with production auth in Phase 6.
   role             AdminRole
   tenantId         String?               @map("tenant_id") @db.Uuid
   createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   sessions         AdminSession[]
   statusHistory    ReportStatusHistory[]
+  fieldFindings    ReportFieldFinding[]  @relation("FieldFindingCollector")
+  reviewedFindings ReportFieldFinding[]  @relation("FieldFindingReviewer")
   completedReports Report[]              @relation("ReportCompletedByAdmin")
   tenant           Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
@@ -148,6 +160,7 @@ model Report {
   images                    ReportImage[]
   categories                ReportCategoryRelation[]
   statusHistory             ReportStatusHistory[]
+  fieldFindings             ReportFieldFinding[]
   aiGenerations             ReportAIGeneration[]
 
   @@index([phoneIdentifier, phoneHmacKeyVersion, createdAt])
@@ -213,6 +226,25 @@ model ReportStatusHistory {
 
   @@index([reportId, createdAt])
   @@map("report_status_history")
+}
+
+model ReportFieldFinding {
+  id                String             @id @default(uuid()) @db.Uuid
+  reportId          String             @map("report_id") @db.Uuid
+  collectorId       String             @map("collector_id") @db.Uuid
+  type              FieldFindingType
+  note              String             @db.VarChar(1000)
+  status            FieldFindingStatus @default(PENDING_REVIEW)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  reviewedAt        DateTime?          @map("reviewed_at") @db.Timestamptz(3)
+  reviewedByAdminId String?            @map("reviewed_by_admin_id") @db.Uuid
+  report            Report             @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  collector         Admin              @relation("FieldFindingCollector", fields: [collectorId], references: [id], onDelete: Restrict)
+  reviewer          Admin?             @relation("FieldFindingReviewer", fields: [reviewedByAdminId], references: [id], onDelete: Restrict)
+
+  @@index([reportId, createdAt])
+  @@index([status, createdAt])
+  @@map("report_field_findings")
 }
 
 model ReportAIGeneration {

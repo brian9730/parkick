@@ -36,6 +36,22 @@
 .admin-map-frame { position: relative; border: 1px solid #d9e4f1; border-radius: 10px; overflow: hidden; background: #f1f5fa; isolation: isolate; }
 .admin-report-map { height: 560px; width: 100%; }
 .admin-dashboard-map .admin-report-map { height: 340px; }
+.admin-hotspot-panel { position: absolute; top: 12px; right: 12px; z-index: 3; box-sizing: border-box; width: min(250px, calc(100% - 24px)); padding: 12px 13px; border: 1px solid #e4eaf1; border-radius: 10px; background: #fff; box-shadow: 0 4px 18px #18385930; color: #394f65; font-size: 11px; }
+.admin-hotspot-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid #edf1f5; }
+.admin-hotspot-heading strong { font-size: 12px; }
+.admin-hotspot-switch { display: flex; align-items: center; box-sizing: border-box; width: 29px; height: 17px; flex: 0 0 auto; padding: 2px; border: 0; border-radius: 99px; background: #8b9eae; cursor: pointer; transition: background .15s ease; }
+.admin-hotspot-switch[aria-checked="true"] { background: #338fdb; }
+.admin-hotspot-switch span { width: 13px; height: 13px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #1a345744; transition: transform .15s ease; }
+.admin-hotspot-switch[aria-checked="true"] span { transform: translateX(12px); }
+.admin-hotspot-switch:focus-visible { outline: 3px solid #154d98; outline-offset: 3px; }
+.admin-hotspot-row { display: flex; align-items: center; gap: 6px; padding-top: 8px; white-space: nowrap; }
+.admin-hotspot-row strong { margin-left: auto; font-size: 11px; }
+.admin-hotspot-row small { color: #7a8da1; font-size: 10px; }
+.admin-hotspot-dot { width: 11px; height: 11px; flex: 0 0 auto; border-radius: 50%; }
+.admin-hotspot-dot.red { background: #e54c5d; }
+.admin-hotspot-dot.yellow { background: #e9b931; }
+.admin-hotspot-note, .admin-hotspot-message { margin: 9px 0 0; color: #72849a; font-size: 10px; line-height: 1.4; }
+.admin-hotspot-message button { padding: 0; border: 0; background: none; color: #225caa; font: inherit; text-decoration: underline; cursor: pointer; }
 .admin-map-loading, .admin-map-unavailable { position: absolute; inset: 0; z-index: 1; background: #f1f5fa; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 13px; padding: 28px; text-align: center; }
 .admin-map-unavailable { color: #6c819b; }
 .admin-map-unavailable strong { color: #3e5c7c; font-size: 16px; }

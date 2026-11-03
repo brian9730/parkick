@@ -30,8 +30,9 @@ function animated(buffer: Buffer, format: 'jpeg' | 'png' | 'webp'): boolean {
   return false;
 }
 
-/** Both local and S3 persistence receive the same decoded, metadata-free JPEG evidence. */
-export async function prepareEvidence(files: readonly EvidenceUpload[]): Promise<PreparedEvidence[]> {
+/** Storage and transient camera analysis receive decoded, metadata-free JPEGs. */
+export async function prepareEvidence(files: readonly EvidenceUpload[], limits?: { maxPixels?: number }): Promise<PreparedEvidence[]> {
+  const maxPixels = limits?.maxPixels ?? MAX_PIXELS;
   if (files.length < 1 || files.length > MAX_PHOTOS) throw new ApiError(400, 'INVALID_PHOTOS', '현장 사진을 1~2장 첨부해주세요.');
   const prepared: PreparedEvidence[] = [];
   for (const file of files) {
@@ -43,9 +44,9 @@ export async function prepareEvidence(files: readonly EvidenceUpload[]): Promise
       || !(format === 'jpeg' ? ['.jpg', '.jpeg'].includes(extension) : extension === `.${format}`)
       || animated(file.buffer, format)) throw badPhoto();
     try {
-      const source = sharp(file.buffer, { limitInputPixels: MAX_PIXELS, failOn: 'warning' });
+      const source = sharp(file.buffer, { limitInputPixels: maxPixels, failOn: 'warning' });
       const metadata = await source.metadata();
-      if (!metadata.width || !metadata.height || metadata.width * metadata.height > MAX_PIXELS
+      if (!metadata.width || !metadata.height || metadata.width * metadata.height > maxPixels
         || metadata.format !== format || (metadata.pages ?? 1) > 1) throw badPhoto();
       // Apply orientation, flatten transparency, rasterize and omit all source metadata.
       const buffer = await source.rotate().flatten({ background: '#ffffff' }).jpeg({ quality: 90 }).timeout({ seconds: 15 }).toBuffer();

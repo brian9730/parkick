@@ -1,0 +1,14 @@
+.collection-shell-header { max-width: none; }
+.collection-shell-account { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.collection-shell-account > span { display: grid; min-width: 0; line-height: 1.35; }
+.collection-shell-account strong { color: #243c55; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collection-shell-account small { color: #72879b; font-size: 10px; }
+.collection-shell-logout { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 7px 11px; border: 1px solid #d4e1ef; border-radius: 8px; background: #fff; color: #315575; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.collection-shell-logout:disabled { opacity: .6; cursor: wait; }
+.collection-shell-logout:focus-visible { outline: 2px solid #075fc8; outline-offset: 2px; }
+.collection-shell-main { min-height: calc(100vh - 72px); }
+@media (max-width: 600px) {
+  .collection-shell-account { gap: 8px; }
+  .collection-shell-account > span { max-width: 90px; }
+  .collection-shell-logout { font-size: 11px; padding-inline: 8px; }
+}

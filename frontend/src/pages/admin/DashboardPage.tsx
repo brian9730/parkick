@@ -1,13 +1,12 @@
 import { ArrowUpRight, Ban, CalendarDays, CheckCheck, FilePlus2, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { adminApi } from '../../api/admin';
 import type { AdminReportSummary, Dashboard } from '../../api/admin';
 import { DashboardPanel, ReportTable } from '../../components/AdminCards';
 import { Button, ErrorState, LoadingState, PhaseNotice, StatusBadge } from '../../components/ui';
 import { AdminReportMapWidget } from '../../features/admin/AdminReportMapWidget';
-import { CollectionMode } from '../../features/admin/CollectionMode';
 import { adminCompletionLabel, formatAdminDate } from '../../features/admin/report-display';
 import { useAdminData } from '../../features/admin/useAdminData';
 import './DashboardPage.css';
@@ -65,6 +64,7 @@ function RecentReportCards({ reports, skeleton }: { reports: AdminReportSummary[
     {skeleton || reports.length === 0 ? <p className="dashboard-recent-empty">{skeleton ? '실제 신고 데이터가 연결되지 않았습니다.' : '최근 접수된 신고가 없습니다.'}</p> : <ul>
       {reports.map(report => <li key={report.publicId}>
         <div className="dashboard-recent-card-top"><Link to={`/admin/reports/${encodeURIComponent(report.publicId)}`}>{report.publicId}</Link><StatusBadge status={report.status} /></div>
+        {report.hasPendingFieldFinding && <span className="field-finding-badge">현장 미발견 · 검토 대기</span>}
         <p>{report.address || '주소 미입력'}</p>
         <div className="dashboard-recent-card-meta"><span>{report.operatorName || '업체 미확인'}{report.deviceId ? ` · ${report.deviceId}` : ''}</span><time dateTime={report.createdAt}>{formatAdminDate(report.createdAt)}</time></div>
         {report.completionMethod && <small>{adminCompletionLabel(report.completionMethod)}</small>}
@@ -100,69 +100,14 @@ function ManagementMode({ refreshKey }: { refreshKey: number }) {
 }
 
 export function DashboardPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const mode = searchParams.get('mode') === 'collect' ? 'collect' : 'manage';
-  const pageValue = Number(searchParams.get('page'));
-  const page = Number.isSafeInteger(pageValue) && pageValue >= 1 && pageValue <= 10_000 ? pageValue : 1;
-  const focusedPublicId = searchParams.get('focus');
   const [refreshKey, setRefreshKey] = useState(0);
-  const [notice, setNotice] = useState(() => {
-    const message = (location.state as { collectionStatusMessage?: unknown } | null)?.collectionStatusMessage;
-    return typeof message === 'string' ? message : '';
-  });
-  const noticeStateCleared = useRef(false);
-
-  useEffect(() => {
-    if (!notice || noticeStateCleared.current) return;
-    noticeStateCleared.current = true;
-    void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-  }, [location.pathname, location.search, navigate, notice]);
-
-  const switchMode = (nextMode: 'manage' | 'collect') => {
-    setNotice('');
-    setSearchParams(current => {
-      const updated = new URLSearchParams(current);
-      if (nextMode === 'collect') updated.set('mode', 'collect');
-      else updated.delete('mode');
-      updated.delete('page');
-      updated.delete('focus');
-      return updated;
-    });
-  };
-
-  const changePage = (nextPage: number) => {
-    setSearchParams(current => {
-      const updated = new URLSearchParams(current);
-      updated.set('mode', 'collect');
-      if (nextPage > 1) updated.set('page', String(nextPage));
-      else updated.delete('page');
-      updated.delete('focus');
-      return updated;
-    });
-  };
-
-  const focusReport = (publicId: string) => {
-    setSearchParams(current => {
-      const updated = new URLSearchParams(current);
-      updated.set('mode', 'collect');
-      updated.set('focus', publicId);
-      return updated;
-    }, { replace: true });
-  };
-
   return <div className="admin-dashboard-page">
     <div className="admin-page-heading">
-      <div><h1>{mode === 'manage' ? '대시보드' : '수거 모드'}</h1><p>{mode === 'manage' ? '신고 접수와 처리 현황을 한눈에 확인하세요.' : '현재 위치에서 가까운 미완료 신고부터 확인하세요.'}</p></div>
+      <div><h1>대시보드</h1><p>신고 접수와 처리 현황을 한눈에 확인하세요.</p></div>
       <div className="dashboard-heading-actions">
-        <div className="dashboard-mode-switch" role="group" aria-label="대시보드 모드">
-          <button type="button" aria-pressed={mode === 'manage'} className={mode === 'manage' ? 'active' : ''} onClick={() => switchMode('manage')}>관리 모드</button>
-          <button type="button" aria-pressed={mode === 'collect'} className={mode === 'collect' ? 'active' : ''} onClick={() => switchMode('collect')}>수거 모드</button>
-        </div>
         <Button variant="secondary" onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={16} />새로고침</Button>
       </div>
     </div>
-    {mode === 'manage' ? <ManagementMode refreshKey={refreshKey} /> : <>{notice && <p className="collection-return-notice" role="status">{notice}</p>}<CollectionMode refreshKey={refreshKey} page={page} focusedPublicId={focusedPublicId} onPageChange={changePage} onFocusChange={focusReport} /></>}
+    <ManagementMode refreshKey={refreshKey} />
   </div>;
 }
